@@ -16,7 +16,7 @@ import { PhoneFriendlyBadge } from './CommunicationPreferences';
 import { WaterSourcePill } from './WaterSourceQuestion';
 import { IntroVideoBadge } from './DetailerIntroVideo';
 import { CallbackScheduler } from './CallbackScheduler';
-import { toast } from 'sonner@2.0.3';
+import { toast } from "sonner";
 
 interface MarketplaceSearchEnhancedProps {
   detailers: Detailer[];

@@ -8,7 +8,7 @@ import { TypingIndicator } from './TypingIndicator';
 import { VoiceNoteRecorder } from './VoiceNoteRecorder';
 import { VoiceNotePlayer } from './VoiceNotePlayer';
 import { motion, AnimatePresence } from 'motion/react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from "sonner";
 import { 
   DropdownMenu,
   DropdownMenuContent,

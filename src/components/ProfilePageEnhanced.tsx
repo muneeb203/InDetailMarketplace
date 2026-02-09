@@ -18,7 +18,7 @@ import { ServiceSpecialtiesSelector } from './ServiceSpecialtiesSelector';
 import { OperatingHoursEditor } from './OperatingHoursEditor';
 import { TrustBadges } from './TrustBadges';
 import { ImageWithFallback } from './figma/ImageWithFallback';
-import { toast } from 'sonner@2.0.3';
+import { toast } from "sonner";
 import { Separator } from './ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 

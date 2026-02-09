@@ -7,7 +7,7 @@ import { Label } from './ui/label';
 import { ImageUpload } from './ImageUpload';
 import { Upload, Palette, Type, FileText, Sparkles } from 'lucide-react';
 import { BrandAssets } from '../types';
-import { toast } from 'sonner@2.0.3';
+import { toast } from "sonner";
 
 interface BrandAssetsStepProps {
   onSave: (assets: BrandAssets) => void;

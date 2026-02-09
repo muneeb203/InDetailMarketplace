@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { SUBSCRIPTION_TIERS, upgradeSubscription } from '../services/stripeService';
 import { Check, Crown, Loader2, X } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from "sonner";
 
 interface SubscriptionModalProps {
   open: boolean;

@@ -5,7 +5,7 @@ import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
 import { StickyNote, Edit3, Save, X, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from "sonner";
 
 interface RelationshipNotesProps {
   clientId: string;

@@ -24,7 +24,7 @@ import { ProPublicProfile } from "./components/detailer/ProPublicProfile";
 import { ProLeadInbox } from "./components/detailer/ProLeadInbox";
 import { DetailerProfileHome } from "./components/detailer/DetailerProfileHome";
 import { Toaster } from "./components/ui/sonner";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import { Customer, Detailer, Lead, Booking } from "./types";
 import { mockDetailers } from "./data/mockData";
 import { getLeadCost } from "./services/stripeService";

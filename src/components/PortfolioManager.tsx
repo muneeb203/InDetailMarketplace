@@ -6,7 +6,7 @@ import { Badge } from './ui/badge';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { Plus, GripVertical, Trash2, Tag, Check } from 'lucide-react';
 import { Reorder } from 'motion/react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from "sonner";
 
 interface PortfolioImage {
   url: string;

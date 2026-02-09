@@ -12,7 +12,7 @@ import { ServiceStatusTracker } from './components/ServiceStatusTracker';
 import { BottomNavigation } from './components/BottomNavigation';
 import { ProfileVehicleDemo } from './components/ProfileVehicleDemo';
 import { Toaster } from './components/ui/sonner';
-import { toast } from 'sonner@2.0.3';
+import { toast } from "sonner";
 import { useStore } from './store/useStore';
 import { Customer, Detailer, ServiceRequest, Booking, Message, Lead } from './types';
 import { mockDetailers, mockBookings, mockMessages, mockLeads } from './data/mockData';

@@ -8,7 +8,7 @@ import { Badge } from './ui/badge';
 import { Switch } from './ui/switch';
 import { Megaphone, Plus, Edit2, Trash2, Calendar, Package } from 'lucide-react';
 import { PromoBanner } from '../types';
-import { toast } from 'sonner@2.0.3';
+import { toast } from "sonner";
 
 interface PromoBannerEditorProps {
   banners?: PromoBanner[];

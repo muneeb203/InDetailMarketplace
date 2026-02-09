@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { CREDIT_PACKAGES, purchaseCredits } from '../services/stripeService';
 import { Check, Loader2, DollarSign, Sparkles } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from "sonner";
 
 interface BuyCreditsModalProps {
   open: boolean;

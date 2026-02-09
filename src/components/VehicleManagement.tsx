@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { Car, Plus, Edit3, Star, Trash2, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from "sonner";
 
 interface Vehicle {
   id: string;

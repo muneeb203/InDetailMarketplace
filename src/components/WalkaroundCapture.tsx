@@ -5,7 +5,7 @@ import { Camera, Mic, X, Check, ChevronRight } from 'lucide-react';
 import { ImageUpload } from './ImageUpload';
 import { Card } from './ui/card';
 import { motion } from 'motion/react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from "sonner";
 import { Progress } from './ui/progress';
 
 interface WalkaroundCaptureProps {

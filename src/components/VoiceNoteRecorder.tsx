@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Mic, X, Send, Pause, Play } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from "sonner";
 
 interface VoiceNoteRecorderProps {
   onSend: (audioBlob: Blob, duration: number, transcript?: string) => void;
