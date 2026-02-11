@@ -58,9 +58,8 @@ export function DetailerDashboardEnhanced({
   };
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-b from-gray-50 to-white">
-      <div className="flex-1 overflow-auto pb-20">
-        <div className="p-4 space-y-4">
+    <div className="w-full bg-gradient-to-b from-gray-50 to-white">
+      <div className="px-8 py-6 space-y-6 max-w-7xl mx-auto">
           {/* Welcome Section */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
@@ -321,7 +320,7 @@ export function DetailerDashboardEnhanced({
                     >
                       <Card
                         className="border-gray-200 cursor-pointer hover:shadow-lg transition-all"
-                        onClick={() => onViewBooking(booking)}
+                        onClick={() => onViewBooking?.(booking)}
                       >
                         <CardHeader>
                           <div className="flex items-start justify-between">
@@ -395,30 +394,29 @@ export function DetailerDashboardEnhanced({
               )}
             </TabsContent>
           </Tabs>
-        </div>
+
+        {/* Modals */}
+        <BuyCreditsModal
+          open={showBuyCredits}
+          onClose={() => setShowBuyCredits(false)}
+          onSuccess={(credits) => {
+            onCreditsAdded?.(credits);
+            setShowBuyCredits(false);
+          }}
+          detailerId={detailer.id}
+        />
+
+        <SubscriptionModal
+          open={showSubscription}
+          onClose={() => setShowSubscription(false)}
+          onSuccess={(tierId) => {
+            onUpgradeToPro?.();
+            setShowSubscription(false);
+          }}
+          detailerId={detailer.id}
+          currentTier={detailer.isPro ? 'pro' : 'free'}
+        />
       </div>
-
-      {/* Modals */}
-      <BuyCreditsModal
-        open={showBuyCredits}
-        onClose={() => setShowBuyCredits(false)}
-        onSuccess={(credits) => {
-          onCreditsAdded?.(credits);
-          setShowBuyCredits(false);
-        }}
-        detailerId={detailer.id}
-      />
-
-      <SubscriptionModal
-        open={showSubscription}
-        onClose={() => setShowSubscription(false)}
-        onSuccess={(tierId) => {
-          onUpgradeToPro();
-          setShowSubscription(false);
-        }}
-        detailerId={detailer.id}
-        currentTier={detailer.isPro ? 'pro' : 'free'}
-      />
     </div>
   );
 }

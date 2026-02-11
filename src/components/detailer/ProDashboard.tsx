@@ -58,50 +58,156 @@ export function ProDashboard({ onNavigate }: ProDashboardProps) {
     },
   ];
 
+  const handleEditProfile = () => {
+    if (onNavigate) {
+      onNavigate('pro-profile-editor', { tab: 'brand' });
+    }
+  };
+
+  const handlePortfolio = () => {
+    if (onNavigate) {
+      onNavigate('pro-profile-editor', { tab: 'portfolio' });
+    }
+  };
+
+  const handleShare = () => {
+    setShowSharePanel(true);
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white pb-24">
-      <div className="max-w-2xl mx-auto p-4 space-y-4">
-        {/* Brand Header Card */}
-        <BrandHeader {...detailer} />
+    <div className="w-full bg-gradient-to-b from-gray-50 to-white">
+      <div className="w-full mx-auto px-8 py-6 max-w-7xl">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Brand Header */}
+          <div className="lg:col-span-1">
+            <BrandHeader {...detailer} />
+          </div>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-3 gap-3">
-          <button
-            onClick={() => onNavigate?.('pro-profile-editor', { tab: 'brand' })}
-            className="h-20 rounded-xl bg-white border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all active:scale-95 flex flex-col items-center justify-center gap-1.5"
-          >
-            <Edit3 className="w-5 h-5 text-gray-700" />
-            <span className="text-xs font-medium text-gray-700">Edit Profile</span>
-          </button>
-          
-          <button
-            onClick={() => onNavigate?.('pro-profile-editor', { tab: 'portfolio' })}
-            className="h-20 rounded-xl bg-white border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all active:scale-95 flex flex-col items-center justify-center gap-1.5"
-          >
-            <Folder className="w-5 h-5 text-gray-700" />
-            <span className="text-xs font-medium text-gray-700">Portfolio</span>
-          </button>
-          
-          <button
-            onClick={() => setShowSharePanel(true)}
-            className="h-20 rounded-xl bg-gradient-to-br from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 transition-all active:scale-95 flex flex-col items-center justify-center gap-1.5 shadow-sm"
-          >
-            <Share2 className="w-5 h-5" />
-            <span className="text-xs font-medium">Share</span>
-          </button>
+          {/* Right Column - Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Quick Actions */}
+            <div className="grid grid-cols-3 gap-4">
+              <button
+                onClick={handleEditProfile}
+                className="h-28 rounded-xl bg-white border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all active:scale-95 flex flex-col items-center justify-center gap-2"
+              >
+                <Edit3 className="w-6 h-6 text-gray-700" />
+                <span className="text-sm font-medium text-gray-700">Edit Profile</span>
+              </button>
+              
+              <button
+                onClick={handlePortfolio}
+                className="h-28 rounded-xl bg-white border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all active:scale-95 flex flex-col items-center justify-center gap-2"
+              >
+                <Folder className="w-6 h-6 text-gray-700" />
+                <span className="text-sm font-medium text-gray-700">Portfolio</span>
+              </button>
+              
+              <button
+                onClick={handleShare}
+                className="h-28 rounded-xl bg-gradient-to-br from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 transition-all active:scale-95 flex flex-col items-center justify-center gap-2 shadow-sm"
+              >
+                <Share2 className="w-6 h-6" />
+                <span className="text-sm font-medium">Share</span>
+              </button>
+            </div>
+
+            {/* Exposure Metrics */}
+            <ExposureMetrics
+              {...metrics}
+              onTipsClick={() => setShowTipsModal(true)}
+            />
+
+            {/* Promo Banner */}
+            <PromoBanner
+              {...promo}
+              onCreatePromo={() => onNavigate?.('pro-profile-editor', { tab: 'brand', section: 'promo' })}
+            />
+
+            {/* Recent Activity Section - Added for scrolling */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h3 className="font-semibold text-gray-900 mb-4">Recent Activity</h3>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">New lead opened</p>
+                    <p className="text-xs text-gray-500">2 hours ago</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">Profile viewed 15 times</p>
+                    <p className="text-xs text-gray-500">Today</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">Quote accepted</p>
+                    <p className="text-xs text-gray-500">Yesterday</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Stats Section - Added for scrolling */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <p className="text-sm text-gray-600 mb-1">This Week</p>
+                <p className="text-2xl font-bold text-gray-900">12</p>
+                <p className="text-xs text-green-600">+3 from last week</p>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <p className="text-sm text-gray-600 mb-1">Response Time</p>
+                <p className="text-2xl font-bold text-gray-900">8m</p>
+                <p className="text-xs text-green-600">-2m improvement</p>
+              </div>
+            </div>
+
+            {/* Additional Content for Scrolling Test */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h3 className="font-semibold text-gray-900 mb-4">Upcoming Bookings</h3>
+              <div className="space-y-3">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Booking #{i}</p>
+                      <p className="text-xs text-gray-500">Tomorrow at 2:00 PM</p>
+                    </div>
+                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">Confirmed</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* More Content */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h3 className="font-semibold text-gray-900 mb-4">Performance This Month</h3>
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-600">Lead Conversion</span>
+                    <span className="font-medium">68%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-blue-600 h-2 rounded-full" style={{ width: '68%' }}></div>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-600">Customer Satisfaction</span>
+                    <span className="font-medium">92%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-green-600 h-2 rounded-full" style={{ width: '92%' }}></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-
-        {/* Exposure Metrics */}
-        <ExposureMetrics
-          {...metrics}
-          onTipsClick={() => setShowTipsModal(true)}
-        />
-
-        {/* Promo Banner */}
-        <PromoBanner
-          {...promo}
-          onCreatePromo={() => onNavigate?.('pro-profile-editor', { tab: 'brand', section: 'promo' })}
-        />
       </div>
 
       {/* Share Panel Modal */}

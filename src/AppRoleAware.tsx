@@ -23,11 +23,13 @@ import { ProProfileEditor } from "./components/detailer/ProProfileEditor";
 import { ProPublicProfile } from "./components/detailer/ProPublicProfile";
 import { ProLeadInbox } from "./components/detailer/ProLeadInbox";
 import { DetailerProfileHome } from "./components/detailer/DetailerProfileHome";
+import { WebLayout } from "./components/WebLayout";
 import { Toaster } from "./components/ui/sonner";
 import { toast } from "sonner";
 import { Customer, Detailer, Lead, Booking } from "./types";
 import { mockDetailers } from "./data/mockData";
 import { getLeadCost } from "./services/stripeService";
+import { FileText, AlertCircle } from "lucide-react";
 
 type View =
   | "welcome"
@@ -48,7 +50,9 @@ type View =
   | "pro-dashboard"
   | "pro-profile-editor"
   | "pro-public-profile"
-  | "pro-lead-inbox";
+  | "pro-lead-inbox"
+  | "quotes"
+  | "alerts";
 
 type AuthFlow = "signin" | "signup";
 
@@ -148,18 +152,53 @@ export default function AppRoleAware() {
     // Mock authentication - in production, this would call your auth service
     toast.success("Signed in successfully!");
 
-    // Create mock user and go to onboarding
-    setTempUserData({
-      name: "John Doe",
-      email,
-      phone: "555-0123",
-      role,
-    });
-
+    // For sign-in, create a mock existing user (skip onboarding)
     if (role === "client") {
-      setCurrentView("onboarding-client");
+      const existingClient: Customer & { role: "client" } = {
+        id: "existing-client-1",
+        role: "client",
+        email,
+        phone: "555-0123",
+        name: "John Smith",
+        location: "San Francisco, CA",
+        createdAt: new Date(),
+        vehicles: [
+          {
+            id: "1",
+            make: "Tesla",
+            model: "Model 3",
+            year: 2022,
+            type: "Sedan",
+            isDefault: true,
+          },
+        ],
+      };
+      setCurrentUser(existingClient);
+      setCurrentView("marketplace");
     } else {
-      setCurrentView("onboarding-detailer");
+      const existingDetailer: Detailer & { role: "detailer" } = {
+        id: "existing-detailer-1",
+        role: "detailer",
+        email,
+        phone: "555-0456",
+        name: "Mike Johnson",
+        businessName: "Elite Auto Detailing",
+        bio: "Welcome to Elite Auto Detailing! We offer premium auto detailing services.",
+        avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80",
+        location: "San Francisco, CA",
+        serviceRadius: 15,
+        priceRange: "$$",
+        rating: 4.9,
+        photos: [],
+        services: ["Full Detail", "Ceramic Coating", "Paint Correction"],
+        specialties: ["Full Detail", "Ceramic Coating", "Paint Correction"],
+        isPro: true,
+        wallet: 25,
+        completedJobs: 247,
+        createdAt: new Date(),
+      };
+      setCurrentUser(existingDetailer);
+      setCurrentView("pro-dashboard");
     }
   };
 
@@ -394,6 +433,32 @@ export default function AppRoleAware() {
       case "profile":
         setCurrentView("profile");
         break;
+      case "quotes":
+        setCurrentView("quotes");
+        break;
+      case "alerts":
+        setCurrentView("alerts");
+        break;
+    }
+  };
+
+  // Handle search
+  const handleSearch = (query: string) => {
+    console.log("Searching for:", query);
+    
+    if (currentUser?.role === "client") {
+      toast.success(`Searching for: ${query}`);
+      setCurrentView("marketplace");
+      // In production, this would filter the detailers list
+    } else {
+      // For detailers, search in leads, bookings, messages
+      toast.success(`Searching for: ${query}`);
+      console.log("Detailer search:", query);
+      // Could search through:
+      // - Lead names/locations
+      // - Booking details
+      // - Message history
+      // For now, just show the search worked
     }
   };
 
@@ -494,10 +559,24 @@ export default function AppRoleAware() {
     return null;
   }
 
-  return (
-    <div className="h-screen max-w-md mx-auto bg-white relative">
-      <Toaster position="top-center" richColors />
+  // Views that should NOT have the web layout (full screen views)
+  const fullScreenViews = [
+    "job-status",
+    "detailer-profile", 
+    "request-quote",
+    "pro-profile-editor",
+    "pro-public-profile",
+    "pro-lead-inbox"
+  ];
 
+  const shouldUseWebLayout = !fullScreenViews.includes(currentView);
+
+  // Determine if we should show profile sidebar (only for clients in marketplace/home)
+  const shouldShowProfileSidebar = currentUser.role === "client" && 
+    (currentView === "marketplace" || currentView === "home");
+
+  const mainContent = (
+    <>
       {/* Marketplace (Client Home) */}
       {currentView === "marketplace" &&
         currentUser.role === "client" && (
@@ -586,7 +665,7 @@ export default function AppRoleAware() {
 
       {/* Messages */}
       {currentView === "messages" && (
-        <div className="h-full pb-16 overflow-hidden">
+        <div className="h-full overflow-hidden">
           <MessagesPageIntegrated
             onViewStatus={handleViewStatus}
           />
@@ -595,7 +674,7 @@ export default function AppRoleAware() {
 
       {/* Bookings */}
       {currentView === "bookings" && (
-        <div className="h-full pb-16 overflow-hidden">
+        <div className="h-full overflow-hidden">
           <BookingsPageIntegrated
             onNavigateToMessages={(bookingId) => {
               setCurrentView("messages");
@@ -633,7 +712,7 @@ export default function AppRoleAware() {
 
       {/* Status Center */}
       {currentView === "status" && (
-        <div className="h-full pb-16 overflow-hidden">
+        <div className="h-full overflow-hidden">
           <StatusCenter
             role={currentUser.role}
             onNavigateToMessages={() => {
@@ -646,8 +725,36 @@ export default function AppRoleAware() {
 
       {/* Profile */}
       {currentView === "profile" && (
-        <div className="h-full pb-16 overflow-hidden">
+        <div className="h-full overflow-hidden">
           <ProfileRoleAware role={currentUser.role} onNavigate={handleProNavigate} />
+        </div>
+      )}
+
+      {/* Quotes Page */}
+      {currentView === "quotes" && (
+        <div className="p-6">
+          <div className="max-w-4xl mx-auto">
+            <h1 className="text-2xl font-bold text-gray-900 mb-6">Quotes</h1>
+            <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+              <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500 mb-2">No quotes yet</p>
+              <p className="text-sm text-gray-400">Your quote requests will appear here</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Alerts Page */}
+      {currentView === "alerts" && (
+        <div className="p-6">
+          <div className="max-w-4xl mx-auto">
+            <h1 className="text-2xl font-bold text-gray-900 mb-6">Elev Alerts</h1>
+            <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+              <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500 mb-2">No alerts</p>
+              <p className="text-sm text-gray-400">Important notifications will appear here</p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -679,28 +786,32 @@ export default function AppRoleAware() {
           }}
         />
       )}
+    </>
+  );
 
-      {/* Bottom Navigation - Hide on specific views */}
-      {currentView !== "job-status" && 
-       currentView !== "detailer-profile" && 
-       currentView !== "request-quote" &&
-       currentView !== "pro-profile-editor" &&
-       currentView !== "pro-public-profile" &&
-       currentView !== "pro-lead-inbox" && (
-        <BottomNavigation
-          currentView={
-            currentView === "marketplace" ||
-            currentView === "dashboard" ||
-            currentView === "pro-dashboard"
-              ? "home"
-              : currentView === "status-demo"
-                ? "status"
-                : currentView
-          }
+  return (
+    <>
+      <Toaster position="top-center" richColors />
+      
+      {shouldUseWebLayout ? (
+        <WebLayout
+          currentView={currentView}
           onNavigate={handleNavigate}
+          userName={currentUser.name}
+          businessName={currentUser.role === 'detailer' ? (currentUser as Detailer).businessName : undefined}
+          userEmail={currentUser.email}
+          userPhone={currentUser.phone}
           userRole={currentUser.role}
-        />
+          showProfileSidebar={shouldShowProfileSidebar}
+          onSearch={handleSearch}
+        >
+          {mainContent}
+        </WebLayout>
+      ) : (
+        <div className="h-screen w-full bg-white relative">
+          {mainContent}
+        </div>
       )}
-    </div>
+    </>
   );
 }
