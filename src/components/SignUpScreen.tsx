@@ -15,7 +15,7 @@ interface SignUpScreenProps {
     phone: string;
     password: string;
     role: 'client' | 'detailer';
-  }) => void;
+  }) => Promise<void> | void;
   onSwitchToSignIn: () => void;
   onChangeRole: () => void;
 }
@@ -93,18 +93,13 @@ export function SignUpScreen({
 
     if (!validate()) return;
 
-    setIsLoading(true);
-
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      setIsLoading(true);
+      await onSignUp({ name, email, phone, password, role });
       setIsSuccess(true);
-      
-      // Show success state briefly before routing
-      setTimeout(() => {
-        onSignUp({ name, email, phone, password, role });
-      }, 800);
-    }, 1200);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const isValid =

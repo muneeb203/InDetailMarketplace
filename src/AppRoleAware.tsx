@@ -28,8 +28,10 @@ import { Toaster } from "./components/ui/sonner";
 import { toast } from "sonner";
 import { Customer, Detailer, Lead, Booking } from "./types";
 import { mockDetailers } from "./data/mockData";
+import { signUpAuthOnly, createClientProfile, createDealerProfile, signInAndLoadProfile } from "./services/supabaseAuth";
 import { getLeadCost } from "./services/stripeService";
 import { FileText, AlertCircle } from "lucide-react";
+import { useAuth } from "./context/AuthContext";
 
 type View =
   | "welcome"
@@ -57,17 +59,12 @@ type View =
 type AuthFlow = "signin" | "signup";
 
 export default function AppRoleAware() {
-  const [currentView, setCurrentView] =
-    useState<View>("welcome");
-  const [selectedRole, setSelectedRole] = useState<
-    "client" | "detailer" | null
-  >(null);
+  const { currentUser, setCurrentUser } = useAuth();
+  const [currentView, setCurrentView] = useState<View>("welcome");
+  const [selectedRole, setSelectedRole] = useState<"client" | "detailer" | null>(null);
   const [authFlow, setAuthFlow] = useState<AuthFlow>("signin");
-  const [currentUser, setCurrentUser] = useState<
-    | ((Customer | Detailer) & { role: "client" | "detailer" })
-    | null
-  >(null);
   const [tempUserData, setTempUserData] = useState<{
+    userId: string;
     name: string;
     email: string;
     phone: string;
@@ -144,131 +141,172 @@ export default function AppRoleAware() {
   };
 
   // Handle sign in
-  const handleSignIn = (
+  const handleSignIn = async (
     email: string,
     password: string,
-    role: "client" | "detailer",
+    _role: "client" | "detailer",
   ) => {
-    // Mock authentication - in production, this would call your auth service
-    toast.success("Signed in successfully!");
+    try {
+      const result = await signInAndLoadProfile(email, password);
 
-    // For sign-in, create a mock existing user (skip onboarding)
-    if (role === "client") {
-      const existingClient: Customer & { role: "client" } = {
-        id: "existing-client-1",
-        role: "client",
-        email,
-        phone: "555-0123",
-        name: "John Smith",
-        location: "San Francisco, CA",
-        createdAt: new Date(),
-        vehicles: [
-          {
-            id: "1",
-            make: "Tesla",
-            model: "Model 3",
-            year: 2022,
-            type: "Sedan",
-            isDefault: true,
-          },
-        ],
-      };
-      setCurrentUser(existingClient);
-      setCurrentView("marketplace");
-    } else {
-      const existingDetailer: Detailer & { role: "detailer" } = {
-        id: "existing-detailer-1",
-        role: "detailer",
-        email,
-        phone: "555-0456",
-        name: "Mike Johnson",
-        businessName: "Elite Auto Detailing",
-        bio: "Welcome to Elite Auto Detailing! We offer premium auto detailing services.",
-        avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80",
-        location: "San Francisco, CA",
-        serviceRadius: 15,
-        priceRange: "$$",
-        rating: 4.9,
-        photos: [],
-        services: ["Full Detail", "Ceramic Coating", "Paint Correction"],
-        specialties: ["Full Detail", "Ceramic Coating", "Paint Correction"],
-        isPro: true,
-        wallet: 25,
-        completedJobs: 247,
-        createdAt: new Date(),
-      };
-      setCurrentUser(existingDetailer);
-      setCurrentView("pro-dashboard");
+      if (result.appRole === "client") {
+        const clientUser: Customer & { role: "client" } = {
+          id: result.profile.id,
+          role: "client",
+          email: result.profile.email,
+          phone: result.profile.phone ?? "",
+          name: result.profile.name,
+          location: result.clientProfile?.base_location ?? "Unknown",
+          createdAt: new Date(result.profile.created_at ?? new Date()),
+          vehicles: result.clientProfile?.vehicle_make
+            ? [
+                {
+                  id: "1",
+                  make: result.clientProfile.vehicle_make,
+                  model: result.clientProfile.vehicle_model ?? "",
+                  year: result.clientProfile.vehicle_year ?? new Date().getFullYear(),
+                  type: "Sedan",
+                  isDefault: true,
+                },
+              ]
+            : [],
+        };
+        setCurrentUser(clientUser);
+        setCurrentView("marketplace");
+        toast.success("Signed in as client");
+      } else if (result.appRole === "detailer") {
+        const dealer = result.dealerProfile;
+        const detailerUser: Detailer & { role: "detailer" } = {
+          id: result.profile.id,
+          role: "detailer",
+          email: result.profile.email,
+          phone: result.profile.phone ?? "",
+          name: result.profile.name,
+          businessName: dealer?.business_name ?? "My Detailing Business",
+          bio: `Welcome to ${dealer?.business_name ?? "our detailing business"}! We offer premium auto detailing services.`,
+          avatar:
+            result.profile.avatar_url ??
+            "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80",
+          location: dealer?.base_location ?? "Unknown",
+          serviceRadius:
+            (dealer?.services_offered as any)?.serviceRadius ?? 15,
+          priceRange: dealer?.price_range ?? "$$",
+          rating: 0,
+          photos: [],
+          services:
+            ((dealer?.services_offered as any)?.specialties as string[]) ?? [],
+          specialties:
+            ((dealer?.services_offered as any)?.specialties as string[]) ?? [],
+          isPro: false,
+          wallet: 0,
+          completedJobs: 0,
+          createdAt: new Date(result.profile.created_at ?? new Date()),
+        };
+        setCurrentUser(detailerUser);
+        setCurrentView("pro-dashboard");
+        toast.success("Signed in as detailer");
+      } else {
+        toast.error("Unsupported role");
+      }
+    } catch (error: any) {
+      toast.error("Sign-in failed", {
+        description: error?.message ?? "Please check your credentials.",
+      });
+      throw error;
     }
   };
 
   // Handle sign up
-  const handleSignUp = (data: {
+  const handleSignUp = async (data: {
     name: string;
     email: string;
     phone: string;
     password: string;
     role: "client" | "detailer";
   }) => {
-    toast.success("Account created successfully!");
+    try {
+      const user = await signUpAuthOnly(data.email, data.password);
 
-    setTempUserData({
-      name: data.name,
-      email: data.email,
-      phone: data.phone,
-      role: data.role,
-    });
+      setTempUserData({
+        userId: user.id,
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        role: data.role,
+      });
 
-    if (data.role === "client") {
-      setCurrentView("onboarding-client");
-    } else {
-      setCurrentView("onboarding-detailer");
+      toast.success("Account created successfully!");
+
+      if (data.role === "client") {
+        setCurrentView("onboarding-client");
+      } else {
+        setCurrentView("onboarding-detailer");
+      }
+    } catch (error: any) {
+      toast.error("Sign-up failed", {
+        description: error?.message ?? "Please try again.",
+      });
+      throw error;
     }
   };
 
   // Handle client onboarding completion
-  const handleClientOnboardingComplete = (data: {
+  const handleClientOnboardingComplete = async (data: {
     location: string;
     vehicle?: { make: string; model: string; year: number };
     notifications: boolean;
   }) => {
     if (!tempUserData) return;
+    try {
+      await createClientProfile({
+        userId: tempUserData.userId,
+        name: tempUserData.name,
+        email: tempUserData.email,
+        phone: tempUserData.phone,
+        location: data.location,
+        vehicle: data.vehicle,
+      });
 
-    const user: Customer & { role: "client" } = {
-      id: Date.now().toString(),
-      role: "client",
-      email: tempUserData.email,
-      phone: tempUserData.phone,
-      name: tempUserData.name,
-      location: data.location,
-      createdAt: new Date(),
-      vehicles: data.vehicle
-        ? [
-            {
-              id: "1",
-              make: data.vehicle.make,
-              model: data.vehicle.model,
-              year: data.vehicle.year,
-              isDefault: true,
-            },
-          ]
-        : [],
-    };
+      const user: Customer & { role: "client" } = {
+        id: tempUserData.userId,
+        role: "client",
+        email: tempUserData.email,
+        phone: tempUserData.phone,
+        name: tempUserData.name,
+        location: data.location,
+        createdAt: new Date(),
+        vehicles: data.vehicle
+          ? [
+              {
+                id: "1",
+                make: data.vehicle.make,
+                model: data.vehicle.model,
+                year: data.vehicle.year,
+                type: "Sedan",
+                isDefault: true,
+              },
+            ]
+          : [],
+      };
 
-    setCurrentUser(user);
-    setCurrentView("marketplace");
-    toast.success(`Welcome to InDetail, ${user.name}!`, {
-      description: "Your account is ready to use.",
-    });
+      setCurrentUser(user);
+      setCurrentView("marketplace");
+      toast.success(`Welcome to InDetail, ${user.name}!`, {
+        description: "Your account is ready to use.",
+      });
 
-    // Analytics anchor
-    console.log("Analytics: onboarding_completed", {
-      role: "client",
-    });
+      console.log("Analytics: onboarding_completed", {
+        role: "client",
+      });
+    } catch (error: any) {
+      toast.error("Could not complete client onboarding", {
+        description: error?.message ?? "Please try again.",
+      });
+    }
   };
 
   // Handle detailer onboarding completion
-  const handleDetailerOnboardingComplete = (data: {
+  const handleDetailerOnboardingComplete = async (data: {
     businessName: string;
     serviceRadius: number;
     location: string;
@@ -277,39 +315,55 @@ export default function AppRoleAware() {
   }) => {
     if (!tempUserData) return;
 
-    const user: Detailer & { role: "detailer" } = {
-      id: Date.now().toString(),
-      role: "detailer",
-      email: tempUserData.email,
-      phone: tempUserData.phone,
-      name: tempUserData.name,
-      businessName: data.businessName,
-      bio: `Welcome to ${data.businessName}! We offer premium auto detailing services.`,
-      avatar:
-        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80",
-      location: data.location,
-      serviceRadius: data.serviceRadius,
-      priceRange: data.priceRange,
-      rating: 0,
-      photos: [],
-      services: data.specialties,
-      specialties: data.specialties,
-      isPro: false,
-      wallet: 5, // Give 5 free credits to start
-      completedJobs: 0,
-      createdAt: new Date(),
-    };
+    try {
+      await createDealerProfile({
+        userId: tempUserData.userId,
+        name: tempUserData.name,
+        email: tempUserData.email,
+        phone: tempUserData.phone,
+        businessName: data.businessName,
+        baseLocation: data.location,
+        priceRange: data.priceRange,
+        specialties: data.specialties,
+      });
 
-    setCurrentUser(user);
-    setCurrentView("pro-dashboard"); // Start with Pro Dashboard instead of legacy dashboard
-    toast.success(`Welcome to InDetail, ${user.name}!`, {
-      description: "Your business profile is ready.",
-    });
+      const user: Detailer & { role: "detailer" } = {
+        id: tempUserData.userId,
+        role: "detailer",
+        email: tempUserData.email,
+        phone: tempUserData.phone,
+        name: tempUserData.name,
+        businessName: data.businessName,
+        bio: `Welcome to ${data.businessName}! We offer premium auto detailing services.`,
+        avatar:
+          "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80",
+        location: data.location,
+        serviceRadius: data.serviceRadius,
+        priceRange: data.priceRange,
+        rating: 0,
+        photos: [],
+        services: data.specialties,
+        specialties: data.specialties,
+        isPro: false,
+        wallet: 5,
+        completedJobs: 0,
+        createdAt: new Date(),
+      };
 
-    // Analytics anchor
-    console.log("Analytics: onboarding_completed", {
-      role: "detailer",
-    });
+      setCurrentUser(user);
+      setCurrentView("pro-dashboard");
+      toast.success(`Welcome to InDetail, ${user.name}!`, {
+        description: "Your business profile is ready.",
+      });
+
+      console.log("Analytics: onboarding_completed", {
+        role: "detailer",
+      });
+    } catch (error: any) {
+      toast.error("Could not complete detailer onboarding", {
+        description: error?.message ?? "Please try again.",
+      });
+    }
   };
 
   // Handle Pro navigation

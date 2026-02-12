@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 interface SignInScreenProps {
   role: 'client' | 'detailer';
   onBack: () => void;
-  onSignIn: (email: string, password: string, role: 'client' | 'detailer') => void;
+  onSignIn: (email: string, password: string, role: 'client' | 'detailer') => Promise<void> | void;
   onSwitchToSignUp: () => void;
   onChangeRole: () => void;
 }
@@ -54,18 +54,15 @@ export function SignInScreen({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     setTouched({ email: true, password: true });
-    
     if (!validate()) return;
 
-    setIsLoading(true);
-
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      setIsLoading(true);
+      await onSignIn(email, password, role);
+    } finally {
       setIsLoading(false);
-      onSignIn(email, password, role);
-    }, 800);
+    }
   };
 
   const isValid = email && password && Object.keys(errors).length === 0;
