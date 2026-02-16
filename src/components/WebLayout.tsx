@@ -1,5 +1,5 @@
 import React, { ReactNode, useState } from 'react';
-import { Search, Bell, User, MessageSquare, Calendar, Activity, FileText, AlertCircle, Home } from 'lucide-react';
+import { Search, Bell, User, MessageSquare, Calendar, Activity, FileText, AlertCircle, Home, Settings, LogOut } from 'lucide-react';
 import { ProfileSidebar } from './ProfileSidebar';
 
 interface WebLayoutProps {
@@ -13,6 +13,7 @@ interface WebLayoutProps {
   userRole?: 'client' | 'detailer';
   showProfileSidebar?: boolean;
   onSearch?: (query: string) => void;
+  onLogout?: () => void;
 }
 
 export function WebLayout({ 
@@ -25,7 +26,8 @@ export function WebLayout({
   userPhone,
   userRole = "client",
   showProfileSidebar = true,
-  onSearch
+  onSearch,
+  onLogout,
 }: WebLayoutProps) {
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -294,6 +296,50 @@ export function WebLayout({
                 </span>
               )}
             </button>
+
+            <div className="pt-2 mt-2 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onNavigate('settings');
+                }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors cursor-pointer ${
+                  currentView === 'settings'
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
+                title="Settings"
+              >
+                <Settings className="w-5 h-5 flex-shrink-0" />
+                {isSidebarExpanded && (
+                  <span className="font-medium whitespace-nowrap">
+                    Settings
+                  </span>
+                )}
+              </button>
+
+              {onLogout && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onLogout();
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors cursor-pointer text-gray-700 hover:bg-red-50 hover:text-red-600"
+                  title="Logout"
+                >
+                  <LogOut className="w-5 h-5 flex-shrink-0" />
+                  {isSidebarExpanded && (
+                    <span className="font-medium whitespace-nowrap">
+                      Logout
+                    </span>
+                  )}
+                </button>
+              )}
+            </div>
           </nav>
         </aside>
 

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Percent, Plus, Calendar } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Percent, Plus, Calendar, TrendingUp } from 'lucide-react';
 import { cn } from '../ui/utils';
 import { OfferDetailsModal } from './OfferDetailsModal';
 
@@ -9,9 +9,22 @@ interface PromoBannerProps {
   startDate?: string;
   endDate?: string;
   active: boolean;
+  performanceIndicator?: string;
   onCreatePromo?: () => void;
   onViewOffer?: () => void;
   className?: string;
+}
+
+function getDaysLeft(endDateStr: string): number | null {
+  try {
+    const end = new Date(endDateStr);
+    const now = new Date();
+    const diff = end.getTime() - now.getTime();
+    if (diff <= 0) return 0;
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  } catch {
+    return null;
+  }
 }
 
 export function PromoBanner({
@@ -20,33 +33,39 @@ export function PromoBanner({
   startDate,
   endDate,
   active,
+  performanceIndicator,
   onCreatePromo,
   onViewOffer,
   className,
 }: PromoBannerProps) {
   const [showOfferModal, setShowOfferModal] = useState(false);
+  const [daysLeft, setDaysLeft] = useState<number | null>(null);
 
-  const handleViewOffer = () => {
-    setShowOfferModal(true);
-  };
+  useEffect(() => {
+    if (active && endDate) {
+      setDaysLeft(getDaysLeft(endDate));
+      const t = setInterval(() => setDaysLeft(getDaysLeft(endDate)), 60000);
+      return () => clearInterval(t);
+    }
+  }, [active, endDate]);
 
   if (!active) {
     return (
-      <div className={cn("bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl shadow-sm border border-orange-200", className)}>
+      <div className={cn("bg-white rounded-xl border border-gray-200 shadow-sm", className)}>
         <div className="p-6 text-center">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center mx-auto mb-4">
-            <Percent className="w-8 h-8 text-white" />
+          <div className="w-14 h-14 rounded-xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
+            <Percent className="w-7 h-7 text-gray-400" />
           </div>
-          <h3 className="font-semibold text-gray-900 mb-2">No Active Promotion</h3>
-          <p className="text-gray-600 text-sm mb-4">
-            Attract more customers with a limited-time offer
+          <h2 className="text-base font-semibold text-gray-900 mb-1">No active promotion</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Improve visibility by promoting your gig with a limited-time offer.
           </p>
           <button
             onClick={onCreatePromo}
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold hover:from-orange-600 hover:to-amber-600 transition-all active:scale-95 shadow-sm"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-all active:scale-[0.98]"
           >
             <Plus className="w-4 h-4" />
-            <span>Create Promo</span>
+            Create promo
           </button>
         </div>
       </div>
@@ -54,48 +73,52 @@ export function PromoBanner({
   }
 
   return (
-    <div className={cn("bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600 rounded-2xl shadow-lg border border-orange-400 overflow-hidden", className)}>
-      {/* Decorative pattern */}
-      <div className="absolute inset-0 opacity-10">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white rounded-full -translate-y-16 translate-x-16" />
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white rounded-full translate-y-12 -translate-x-12" />
-      </div>
-
-      <div className="relative p-6">
-        <div className="flex items-start gap-3 mb-4">
-          <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
-            <Percent className="w-6 h-6 text-white" />
+    <div className={cn("bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden", className)}>
+      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-5 border-b border-gray-100">
+        <div className="flex items-start gap-3">
+          <div className="w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+            <Percent className="w-5 h-5 text-blue-600" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-sm text-white text-xs font-medium mb-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-              Active Promotion
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 text-xs font-medium mb-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+              Active promotion
+            </span>
+            <h2 className="font-semibold text-gray-900 text-base mb-0.5">{title}</h2>
+            <p className="text-gray-600 text-sm">{description}</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4 mt-4">
+          {(startDate || endDate) && (
+            <div className="flex items-center gap-1.5 text-sm text-gray-600">
+              <Calendar className="w-4 h-4" />
+              <span>{startDate} – {endDate}</span>
             </div>
-            <h3 className="font-bold text-white text-lg mb-1">{title}</h3>
-            <p className="text-white/90 text-sm">{description}</p>
-          </div>
+          )}
+          {daysLeft != null && daysLeft > 0 && (
+            <div className="px-2.5 py-1 rounded-lg bg-white/80 text-sm font-medium text-gray-700">
+              {daysLeft} day{daysLeft !== 1 ? 's' : ''} left
+            </div>
+          )}
+          {performanceIndicator && (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-green-50 text-green-700 text-sm font-medium">
+              <TrendingUp className="w-4 h-4" />
+              {performanceIndicator}
+            </div>
+          )}
         </div>
+      </div>
 
-        {/* Dates */}
-        <div className="flex items-center gap-4 mb-4 text-white/90 text-sm">
-          <div className="flex items-center gap-1.5">
-            <Calendar className="w-4 h-4" />
-            <span>{startDate}</span>
-          </div>
-          <span>→</span>
-          <span>{endDate}</span>
-        </div>
-
-        {/* Action */}
+      <div className="p-4 bg-white">
         <button
-          onClick={handleViewOffer}
-          className="w-full h-11 rounded-xl bg-white text-orange-600 font-semibold hover:bg-orange-50 transition-all active:scale-95 shadow-sm"
+          onClick={() => (onViewOffer ? onViewOffer() : setShowOfferModal(true))}
+          className="w-full h-10 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-all active:scale-[0.98]"
         >
-          View Offer Details
+          View offer details
         </button>
       </div>
 
-      {/* Offer Details Modal */}
       {title && description && startDate && endDate && (
         <OfferDetailsModal
           isOpen={showOfferModal}

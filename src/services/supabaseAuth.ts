@@ -24,30 +24,37 @@ export async function createClientProfile(params: {
   name: string;
   email: string;
   phone?: string;
-  location: string;
+  location_lat: number | null;
+  location_lng: number | null;
   vehicle?: { make: string; model: string; year: number };
 }) {
-  const { userId, name, email, phone, location, vehicle } = params;
+  const { userId, name, email, phone, location_lat, location_lng, vehicle } = params;
 
-  // Base profile
-  const { error: profileError } = await supabase.from('profiles').insert({
-    id: userId,
-    role: 'client',
-    name,
-    email,
-    phone,
-  });
+  // Base profile (upsert so re-running onboarding doesn't hit "duplicate key" if profile exists)
+  const { error: profileError } = await supabase.from('profiles').upsert(
+    {
+      id: userId,
+      role: 'client',
+      name,
+      email,
+      phone,
+    },
+    { onConflict: 'id' }
+  );
   if (profileError) throw profileError;
 
-  // Client extension
-  const { error: clientError } = await supabase.from('client_profiles').insert({
-    id: userId,
-    location_lat: null,
-    location_lng: null,
-    vehicle_make: vehicle?.make ?? null,
-    vehicle_model: vehicle?.model ?? null,
-    vehicle_year: vehicle?.year ?? null,
-  });
+  // Client extension — only store lat/lng (no city/state in DB)
+  const { error: clientError } = await supabase.from('client_profiles').upsert(
+    {
+      id: userId,
+      location_lat,
+      location_lng,
+      vehicle_make: vehicle?.make ?? null,
+      vehicle_model: vehicle?.model ?? null,
+      vehicle_year: vehicle?.year ?? null,
+    },
+    { onConflict: 'id' }
+  );
   if (clientError) throw clientError;
 }
 
@@ -72,27 +79,33 @@ export async function createDealerProfile(params: {
     specialties,
   } = params;
 
-  const { error: profileError } = await supabase.from('profiles').insert({
-    id: userId,
-    role: 'dealer',
-    name,
-    email,
-    phone,
-  });
+  const { error: profileError } = await supabase.from('profiles').upsert(
+    {
+      id: userId,
+      role: 'dealer',
+      name,
+      email,
+      phone,
+    },
+    { onConflict: 'id' }
+  );
   if (profileError) throw profileError;
 
   const services_offered = {
     specialties,
   };
 
-  const { error: dealerError } = await supabase.from('dealer_profiles').insert({
-    id: userId,
-    business_name: businessName,
-    base_location: baseLocation,
-    services_offered,
-    price_range: priceRange,
-    logo_url: null,
-  });
+  const { error: dealerError } = await supabase.from('dealer_profiles').upsert(
+    {
+      id: userId,
+      business_name: businessName,
+      base_location: baseLocation,
+      services_offered,
+      price_range: priceRange,
+      logo_url: null,
+    },
+    { onConflict: 'id' }
+  );
   if (dealerError) throw dealerError;
 }
 

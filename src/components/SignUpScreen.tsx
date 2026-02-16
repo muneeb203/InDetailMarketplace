@@ -387,12 +387,12 @@ export function SignUpScreen({
                 className={`w-full h-12 transition-all duration-300 ${
                   isSuccess
                     ? 'bg-green-600 hover:bg-green-600'
-                    : 'bg-[#0078FF] hover:bg-[#0056CC]'
+                    : 'bg-[#0078FF] hover:bg-[#0056CC] active:bg-[#0056CC]'
                 } text-white shadow-lg ${
                   isValid && !isLoading
                     ? 'shadow-blue-200/50'
                     : 'shadow-none'
-                } disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed`}
+                } disabled:bg-[#0078FF] disabled:text-white disabled:opacity-70 disabled:cursor-not-allowed`}
                 disabled={!isValid || isLoading || isSuccess}
               >
                 <AnimatePresence mode="wait">

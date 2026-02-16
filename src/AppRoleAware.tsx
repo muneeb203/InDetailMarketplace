@@ -28,9 +28,12 @@ import { Toaster } from "./components/ui/sonner";
 import { toast } from "sonner";
 import { Customer, Detailer, Lead, Booking } from "./types";
 import { mockDetailers } from "./data/mockData";
+import { useDetailers } from "./hooks/useDetailers";
 import { signUpAuthOnly, createClientProfile, createDealerProfile, signInAndLoadProfile } from "./services/supabaseAuth";
+import { supabase } from "./lib/supabaseClient";
 import { getLeadCost } from "./services/stripeService";
 import { FileText, AlertCircle } from "lucide-react";
+import { DebugDataSource } from "./components/DebugDataSource";
 import { useAuth } from "./context/AuthContext";
 
 type View =
@@ -54,12 +57,13 @@ type View =
   | "pro-public-profile"
   | "pro-lead-inbox"
   | "quotes"
-  | "alerts";
+  | "alerts"
+  | "settings";
 
 type AuthFlow = "signin" | "signup";
 
 export default function AppRoleAware() {
-  const { currentUser, setCurrentUser } = useAuth();
+  const { currentUser, setCurrentUser, clearUser } = useAuth();
   const [currentView, setCurrentView] = useState<View>("welcome");
   const [selectedRole, setSelectedRole] = useState<"client" | "detailer" | null>(null);
   const [authFlow, setAuthFlow] = useState<AuthFlow>("signin");
@@ -77,6 +81,25 @@ export default function AppRoleAware() {
     string | null
   >(null);
   const [proNavParams, setProNavParams] = useState<any>({});
+  
+  // Fetch real detailers from Supabase
+  const { detailers, loading: detailersLoading, error: detailersError } = useDetailers();
+  
+  // Log what we got from Supabase
+  console.log('📊 Detailers from Supabase:', detailers.length, 'detailers');
+  console.log('⏳ Loading:', detailersLoading);
+  console.log('❌ Error:', detailersError);
+  
+  // Fallback to mock data if Supabase fails or is empty
+  const displayDetailers = detailers.length > 0 ? detailers : mockDetailers;
+  console.log('🎯 Displaying:', displayDetailers.length, 'detailers', displayDetailers.length === detailers.length ? '(from Supabase)' : '(from mock data)');
+  
+  // Show a toast notification about data source
+  if (detailers.length > 0 && currentView === 'marketplace') {
+    console.log('✅ Using REAL data from Supabase!');
+  } else if (currentView === 'marketplace') {
+    console.log('⚠️ Using MOCK data (Supabase returned 0 detailers)');
+  }
   
   // Mock leads and bookings for demo
   const [mockLeads, setMockLeads] = useState<Lead[]>([
@@ -253,6 +276,8 @@ export default function AppRoleAware() {
   // Handle client onboarding completion
   const handleClientOnboardingComplete = async (data: {
     location: string;
+    location_lat: number | null;
+    location_lng: number | null;
     vehicle?: { make: string; model: string; year: number };
     notifications: boolean;
   }) => {
@@ -263,7 +288,8 @@ export default function AppRoleAware() {
         name: tempUserData.name,
         email: tempUserData.email,
         phone: tempUserData.phone,
-        location: data.location,
+        location_lat: data.location_lat,
+        location_lng: data.location_lng,
         vehicle: data.vehicle,
       });
 
@@ -493,6 +519,9 @@ export default function AppRoleAware() {
       case "alerts":
         setCurrentView("alerts");
         break;
+      case "settings":
+        setCurrentView("settings");
+        break;
     }
   };
 
@@ -536,6 +565,21 @@ export default function AppRoleAware() {
   const handleSwitchAuthFlow = () => {
     setAuthFlow(authFlow === "signin" ? "signup" : "signin");
     setCurrentView(authFlow === "signin" ? "signup" : "signin");
+  };
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      clearUser();
+      setCurrentView("welcome");
+      setSelectedRole(null);
+      toast.success("You have been signed out.");
+    } catch {
+      clearUser();
+      setCurrentView("welcome");
+      setSelectedRole(null);
+      toast.success("You have been signed out.");
+    }
   };
 
   // Welcome screen
@@ -634,17 +678,23 @@ export default function AppRoleAware() {
       {/* Marketplace (Client Home) */}
       {currentView === "marketplace" &&
         currentUser.role === "client" && (
-          <MarketplaceSearchEnhanced
-            detailers={mockDetailers}
-            onSelectDetailer={(detailer) => {
-              setSelectedDetailerId(detailer.id);
-              setCurrentView("detailer-profile");
-            }}
-            onRequestQuote={(detailer) => {
-              setSelectedDetailerId(detailer.id);
-              setCurrentView("request-quote");
-            }}
-          />
+          <>
+            <MarketplaceSearchEnhanced
+              detailers={displayDetailers}
+              onSelectDetailer={(detailer) => {
+                setSelectedDetailerId(detailer.id);
+                setCurrentView("detailer-profile");
+              }}
+              onRequestQuote={(detailer) => {
+                setSelectedDetailerId(detailer.id);
+                setCurrentView("request-quote");
+              }}
+            />
+            <DebugDataSource 
+              detailersCount={displayDetailers.length}
+              isFromSupabase={detailers.length > 0}
+            />
+          </>
         )}
 
       {/* Dashboard (Detailer Home) */}
@@ -812,10 +862,29 @@ export default function AppRoleAware() {
         </div>
       )}
 
+      {/* Settings Page */}
+      {currentView === "settings" && (
+        <div className="p-6">
+          <div className="max-w-4xl mx-auto">
+            <h1 className="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
+            <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
+              <section>
+                <h2 className="text-base font-semibold text-gray-900 mb-2">Account</h2>
+                <p className="text-sm text-gray-500">Manage your account and preferences here.</p>
+              </section>
+              <section>
+                <h2 className="text-base font-semibold text-gray-900 mb-2">Notifications</h2>
+                <p className="text-sm text-gray-500">Configure how you receive alerts and updates.</p>
+              </section>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Detailer Profile (Public - Enhanced) */}
       {currentView === "detailer-profile" && selectedDetailerId && (
         <DetailerProfileEnhancedPublic
-          detailer={mockDetailers.find(d => d.id === selectedDetailerId) || mockDetailers[0]}
+          detailer={displayDetailers.find(d => d.id === selectedDetailerId) || displayDetailers[0]}
           onBack={() => setCurrentView("marketplace")}
           onRequestQuote={() => {
             setCurrentView("request-quote");
@@ -831,7 +900,7 @@ export default function AppRoleAware() {
       {/* Request Quote Form */}
       {currentView === "request-quote" && selectedDetailerId && currentUser.role === "client" && (
         <BookingRequestForm
-          detailer={mockDetailers.find(d => d.id === selectedDetailerId) || mockDetailers[0]}
+          detailer={displayDetailers.find(d => d.id === selectedDetailerId) || displayDetailers[0]}
           onBack={() => setCurrentView("marketplace")}
           onSubmit={(data) => {
             console.log("Quote request submitted:", data);
@@ -858,6 +927,7 @@ export default function AppRoleAware() {
           userRole={currentUser.role}
           showProfileSidebar={shouldShowProfileSidebar}
           onSearch={handleSearch}
+          onLogout={handleLogout}
         >
           {mainContent}
         </WebLayout>
