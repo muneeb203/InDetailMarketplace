@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { ArrowLeft, Save, Eye, Upload, Plus, X, Trash2, GripVertical, MapPin, Clock, Phone } from 'lucide-react';
 import { SocialIcons } from './SocialIcons';
 import { SocialPreviewModal } from './SocialPreviewModal';
+import { DealerImageManager } from './DealerImageManager';
+import { useAuth } from '../../context/AuthContext';
 import { cn } from '../ui/utils';
 
 // Helper to get navigation functions (works with or without react-router)
@@ -34,6 +36,7 @@ interface ProProfileEditorProps {
 
 export function ProProfileEditor({ onNavigate }: ProProfileEditorProps = {}) {
   const { navigate, location } = useNav();
+  const { currentUser } = useAuth();
   const queryParams = new URLSearchParams(location.search);
   const initialTab = (queryParams.get('tab') as Tab) || 'brand';
 
@@ -154,20 +157,11 @@ export function ProProfileEditor({ onNavigate }: ProProfileEditorProps = {}) {
             <div className="bg-white rounded-2xl shadow-sm border p-6">
               <h2 className="font-semibold text-lg mb-4">Brand Assets</h2>
               
-              <div className="space-y-4">
-                {/* Logo Upload */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Logo</label>
-                  <div className="flex items-center gap-4">
-                    <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-2xl">
-                      E
-                    </div>
-                    <button className="px-4 py-2 rounded-lg border-2 border-gray-300 text-gray-700 font-medium hover:border-blue-400 hover:bg-blue-50 transition-colors flex items-center gap-2">
-                      <Upload className="w-4 h-4" />
-                      Upload Logo
-                    </button>
-                  </div>
-                </div>
+              <div className="space-y-6">
+                {/* Logo & Portfolio (Supabase Storage) */}
+                {currentUser?.role === 'detailer' && currentUser?.id && (
+                  <DealerImageManager userId={currentUser.id} />
+                )}
 
                 {/* Banner Upload */}
                 <div>

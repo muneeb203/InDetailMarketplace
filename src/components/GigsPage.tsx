@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useDetailers } from '../hooks/useDetailers';
 import { DetailerFilters } from '../services/detailerService';
 import { Detailer } from '../types';
+import { ImageWithFallback } from './figma/ImageWithFallback';
 import { Loader2, MapPin, Star, DollarSign, Award } from 'lucide-react';
 
 interface GigsPageProps {
@@ -136,11 +137,11 @@ function GigCard({ detailer, onClick }: GigCardProps) {
       onClick={onClick}
       className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
     >
-      {/* Image */}
+      {/* Image - portfolio first, then logo, then avatar */}
       <div className="relative h-48 bg-gray-200">
-        {detailer.photos[0] ? (
-          <img
-            src={detailer.photos[0]}
+        {(detailer.photos?.[0] ?? detailer.logo ?? detailer.avatar) ? (
+          <ImageWithFallback
+            src={detailer.photos?.[0] ?? detailer.logo ?? detailer.avatar}
             alt={detailer.businessName}
             className="w-full h-full object-cover"
           />

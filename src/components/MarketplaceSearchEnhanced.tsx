@@ -209,11 +209,11 @@ export function MarketplaceSearchEnhanced({
               className="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden hover:shadow-xl hover:border-blue-200 transition-all duration-300 transform hover:-translate-y-1"
             >
               <div className="relative group">
-                {/* Main Image with Gradient Overlay */}
+                {/* Main Image - portfolio first, then logo, then avatar */}
                 <div className="relative h-56 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
-                  {detailer.photos.length > 0 ? (
+                  {(detailer.photos?.[0] ?? detailer.logo ?? detailer.avatar) ? (
                     <ImageWithFallback
-                      src={detailer.photos[0]}
+                      src={detailer.photos?.[0] ?? detailer.logo ?? detailer.avatar}
                       alt={detailer.businessName}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />

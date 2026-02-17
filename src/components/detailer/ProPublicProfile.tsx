@@ -5,6 +5,8 @@ import { SocialIcons } from './SocialIcons';
 import { BeforeAfterCarousel } from './BeforeAfterCarousel';
 import { GalleryLightbox } from './GalleryLightbox';
 import { SocialPreviewModal } from './SocialPreviewModal';
+import { useAuth } from '../../context/AuthContext';
+import { useDealerProfile } from '../../hooks/useDealerProfile';
 
 // Helper to get navigation functions (works with or without react-router)
 function useNav() {
@@ -26,6 +28,10 @@ interface ProPublicProfileProps {
 
 export function ProPublicProfile({ onNavigate }: ProPublicProfileProps = {}) {
   const navigate = useNav();
+  const { currentUser } = useAuth();
+  const { data: dealerProfile } = useDealerProfile(
+    currentUser?.role === 'detailer' ? currentUser.id : undefined
+  );
   const [showGallery, setShowGallery] = useState(false);
   const [showSocialModal, setShowSocialModal] = useState(false);
   const [selectedSocial, setSelectedSocial] = useState<{ platform: string; handle: string } | null>(null);
@@ -38,12 +44,12 @@ export function ProPublicProfile({ onNavigate }: ProPublicProfileProps = {}) {
     }
   };
 
-  // Mock data
+  // Use real dealer profile when available, fallback to mock
   const detailer = {
-    logo: undefined,
-    shopName: 'Elite Auto Detailing',
+    logo: dealerProfile?.logo_url ?? undefined,
+    shopName: dealerProfile?.business_name ?? 'Elite Auto Detailing',
     tagline: 'Perfection in every detail',
-    city: 'San Francisco',
+    city: dealerProfile?.base_location ?? 'San Francisco',
     radiusBadge: '15 mi radius',
     badges: {
       verified: true,

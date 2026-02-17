@@ -22,6 +22,7 @@ import { ProDashboard } from "./components/detailer/ProDashboard";
 import { ProProfileEditor } from "./components/detailer/ProProfileEditor";
 import { ProPublicProfile } from "./components/detailer/ProPublicProfile";
 import { ProLeadInbox } from "./components/detailer/ProLeadInbox";
+import { DealerSettings } from "./components/detailer/DealerSettings/DealerSettings";
 import { DetailerProfileHome } from "./components/detailer/DetailerProfileHome";
 import { WebLayout } from "./components/WebLayout";
 import { Toaster } from "./components/ui/sonner";
@@ -336,6 +337,8 @@ export default function AppRoleAware() {
     businessName: string;
     serviceRadius: number;
     location: string;
+    locationLat: number;
+    locationLng: number;
     specialties: string[];
     priceRange: string;
   }) => {
@@ -349,6 +352,9 @@ export default function AppRoleAware() {
         phone: tempUserData.phone,
         businessName: data.businessName,
         baseLocation: data.location,
+        locationLat: data.locationLat,
+        locationLng: data.locationLng,
+        serviceRadius: data.serviceRadius,
         priceRange: data.priceRange,
         specialties: data.specialties,
       });
@@ -864,20 +870,24 @@ export default function AppRoleAware() {
 
       {/* Settings Page */}
       {currentView === "settings" && (
-        <div className="p-6">
-          <div className="max-w-4xl mx-auto">
-            <h1 className="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
-            <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
-              <section>
-                <h2 className="text-base font-semibold text-gray-900 mb-2">Account</h2>
-                <p className="text-sm text-gray-500">Manage your account and preferences here.</p>
-              </section>
-              <section>
-                <h2 className="text-base font-semibold text-gray-900 mb-2">Notifications</h2>
-                <p className="text-sm text-gray-500">Configure how you receive alerts and updates.</p>
-              </section>
+        <div className="h-full overflow-auto">
+          {currentUser.role === "detailer" ? (
+            <DealerSettings onNavigate={(v) => setCurrentView(v as View)} />
+          ) : (
+            <div className="p-6 max-w-4xl mx-auto">
+              <h1 className="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
+              <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
+                <section>
+                  <h2 className="text-base font-semibold text-gray-900 mb-2">Account</h2>
+                  <p className="text-sm text-gray-500">Manage your account and preferences here.</p>
+                </section>
+                <section>
+                  <h2 className="text-base font-semibold text-gray-900 mb-2">Notifications</h2>
+                  <p className="text-sm text-gray-500">Configure how you receive alerts and updates.</p>
+                </section>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 

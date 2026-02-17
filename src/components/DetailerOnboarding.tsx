@@ -5,8 +5,9 @@ import { Card } from './ui/card';
 import { Progress } from './ui/progress';
 import { Slider } from './ui/slider';
 import { Badge } from './ui/badge';
-import { Briefcase, MapPin, Award, DollarSign, Camera, Check } from 'lucide-react';
+import { Briefcase, MapPin, Award, DollarSign, Camera, Check, Loader2, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
+import { getCurrentLocation } from '../services/geolocationService';
 
 interface DetailerOnboardingProps {
   userName: string;
@@ -14,6 +15,8 @@ interface DetailerOnboardingProps {
     businessName: string;
     serviceRadius: number;
     location: string;
+    locationLat: number;
+    locationLng: number;
     specialties: string[];
     priceRange: string;
     portfolioPhoto?: string;
@@ -50,6 +53,11 @@ export function DetailerOnboarding({
 
   // Step 2: Service Area
   const [location, setLocation] = useState('');
+  const [locationLat, setLocationLat] = useState<number | null>(null);
+  const [locationLng, setLocationLng] = useState<number | null>(null);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [locationSuccess, setLocationSuccess] = useState(false);
   const [serviceRadius, setServiceRadius] = useState([10]);
 
   // Step 3: Specialties
@@ -72,14 +80,39 @@ export function DetailerOnboarding({
   };
 
   const handleComplete = () => {
+    if (locationLat === null || locationLng === null) return;
     onComplete({
       businessName,
       serviceRadius: serviceRadius[0],
       location,
+      locationLat,
+      locationLng,
       specialties: selectedSpecialties,
       priceRange,
       portfolioPhoto: undefined,
     });
+  };
+
+  const handleUseCurrentLocation = async () => {
+    setLocationLoading(true);
+    setLocationError(null);
+    setLocationSuccess(false);
+    try {
+      const result = await getCurrentLocation();
+      setLocation(result.address);
+      setLocationLat(result.latitude);
+      setLocationLng(result.longitude);
+      setLocationSuccess(true);
+      setLocationError(null);
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      setLocationError(error?.message ?? 'Unable to fetch location');
+      setLocationSuccess(false);
+      setLocationLat(null);
+      setLocationLng(null);
+    } finally {
+      setLocationLoading(false);
+    }
   };
 
   const toggleSpecialty = (specialty: string) => {
@@ -92,7 +125,7 @@ export function DetailerOnboarding({
 
   const canProceed = () => {
     if (step === 1) return businessName.trim().length > 0;
-    if (step === 2) return location.trim().length > 0;
+    if (step === 2) return location.trim().length > 0 && locationLat !== null && locationLng !== null;
     if (step === 3) return selectedSpecialties.length > 0;
     if (step === 4) return priceRange.length > 0;
     return true;
@@ -168,21 +201,57 @@ export function DetailerOnboarding({
                   <label className="text-sm mb-2 block">Base Location</label>
                   <Input
                     value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    placeholder="City or ZIP code"
+                    onChange={(e) => {
+                      setLocation(e.target.value);
+                      if (!e.target.value) {
+                        setLocationLat(null);
+                        setLocationLng(null);
+                        setLocationSuccess(false);
+                      }
+                    }}
+                    placeholder="City or ZIP code (use button below to auto-detect)"
+                    className={locationSuccess ? 'bg-green-50 border-green-200' : ''}
                   />
                 </div>
 
                 <Button
                   variant="outline"
                   className="w-full gap-2"
-                  onClick={() => {
-                    setLocation('San Francisco, CA 94102');
-                  }}
+                  onClick={handleUseCurrentLocation}
+                  disabled={locationLoading}
                 >
-                  <MapPin className="w-4 h-4" />
-                  Use Current Location
+                  {locationLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <MapPin className="w-4 h-4" />
+                  )}
+                  {locationLoading ? 'Fetching location...' : 'Use Current Location'}
                 </Button>
+
+                {locationSuccess && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm">
+                    <Check className="w-4 h-4 flex-shrink-0" />
+                    Location detected
+                  </div>
+                )}
+
+                {locationError && (
+                  <div className="flex flex-col gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      {locationError}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-red-300 text-red-700 hover:bg-red-100"
+                      onClick={handleUseCurrentLocation}
+                      disabled={locationLoading}
+                    >
+                      Retry
+                    </Button>
+                  </div>
+                )}
 
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">

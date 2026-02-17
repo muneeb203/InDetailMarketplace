@@ -7,6 +7,8 @@ import { ServiceSummaryCard } from './ServiceSummaryCard';
 import { ActivityFeed } from './ActivityFeed';
 import { UpcomingBookings } from './UpcomingBookings';
 import { ShareQRPanel } from './ShareQRPanel';
+import { useAuth } from '../../context/AuthContext';
+import { useDealerProfile } from '../../hooks/useDealerProfile';
 
 interface ProDashboardProps {
   onNavigate?: (view: string, params?: any) => void;
@@ -24,12 +26,16 @@ const defaultBookings = [
 ];
 
 export function ProDashboard({ onNavigate }: ProDashboardProps) {
+  const { currentUser } = useAuth();
+  const { data: dealerProfile } = useDealerProfile(
+    currentUser?.role === 'detailer' ? currentUser.id : undefined
+  );
   const [showSharePanel, setShowSharePanel] = useState(false);
   const [showTipsModal, setShowTipsModal] = useState(false);
 
   const detailer = {
-    logo: undefined,
-    shopName: 'Elite Auto Detailing',
+    logo: dealerProfile?.logo_url ?? undefined,
+    shopName: dealerProfile?.business_name ?? 'Elite Auto Detailing',
     tagline: 'Perfection in every detail',
     city: 'San Francisco',
     radiusBadge: '15 mi radius',
@@ -73,6 +79,7 @@ export function ProDashboard({ onNavigate }: ProDashboardProps) {
           {/* Left: Gig header + service summary + quick stats */}
           <div className="lg:col-span-1 space-y-5">
             <BrandHeader
+              logo={detailer.logo}
               shopName={detailer.shopName}
               tagline={detailer.tagline}
               city={detailer.city}

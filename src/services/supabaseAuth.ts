@@ -65,6 +65,9 @@ export async function createDealerProfile(params: {
   phone?: string;
   businessName: string;
   baseLocation: string;
+  locationLat: number;
+  locationLng: number;
+  serviceRadius?: number;
   priceRange: string;
   specialties: string[];
 }) {
@@ -75,6 +78,9 @@ export async function createDealerProfile(params: {
     phone,
     businessName,
     baseLocation,
+    locationLat,
+    locationLng,
+    serviceRadius = 15,
     priceRange,
     specialties,
   } = params;
@@ -93,6 +99,7 @@ export async function createDealerProfile(params: {
 
   const services_offered = {
     specialties,
+    serviceRadius,
   };
 
   const { error: dealerError } = await supabase.from('dealer_profiles').upsert(
@@ -100,9 +107,12 @@ export async function createDealerProfile(params: {
       id: userId,
       business_name: businessName,
       base_location: baseLocation,
+      location_lat: locationLat,
+      location_lng: locationLng,
       services_offered,
       price_range: priceRange,
       logo_url: null,
+      portfolio_images: [],
     },
     { onConflict: 'id' }
   );
