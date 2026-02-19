@@ -58,6 +58,8 @@
       open: true,
       host: true, // Allow external access
       allowedHosts: [
+        'in-detail-marketplace.vercel.app',
+        '.vercel.app', // Allow Vercel preview deployments
         'oversoftly-uniramous-kimberlee.ngrok-free.dev',
         '.ngrok-free.dev', // Allow any ngrok subdomain
         '.ngrok.io',
