@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useDetailers } from '../hooks/useDetailers';
 import { DetailerFilters } from '../services/detailerService';
 import { Detailer } from '../types';
 import { ImageWithFallback } from './figma/ImageWithFallback';
-import { Loader2, MapPin, Star, DollarSign, Award } from 'lucide-react';
+import { fetchDealerSocialLinks, type SocialPlatform } from '../services/dealerSocialService';
+import { Loader2, MapPin, Star, DollarSign, Award, Clock, Instagram, Facebook } from 'lucide-react';
 
 interface GigsPageProps {
   onSelectGig?: (detailer: Detailer) => void;
@@ -131,7 +132,27 @@ interface GigCardProps {
   onClick?: () => void;
 }
 
+function TikTokIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-5.2 1.74 2.89 2.89 0 012.31-4.64 2.93 2.93 0 01.88.13V9.4a6.84 6.84 0 00-1-.05A6.33 6.33 0 005 20.1a6.34 6.34 0 0010.86-4.43v-7a8.16 8.16 0 004.77 1.52v-3.4a4.85 4.85 0 01-1-.1z" />
+    </svg>
+  );
+}
+
+const SOCIAL_ICONS = { instagram: Instagram, tiktok: TikTokIcon, facebook: Facebook } as const;
+
 function GigCard({ detailer, onClick }: GigCardProps) {
+  const [socialLinks, setSocialLinks] = useState<{ platform: SocialPlatform; url: string }[]>([]);
+
+  useEffect(() => {
+    fetchDealerSocialLinks(detailer.id)
+      .then((rows) => setSocialLinks(rows.map((r) => ({ platform: r.platform, url: r.url }))))
+      .catch(() => setSocialLinks([]));
+  }, [detailer.id]);
+
+  const responseTime = detailer.responseTime ?? (detailer.isPro ? 10 : 30);
+
   return (
     <div
       onClick={onClick}
@@ -188,6 +209,35 @@ function GigCard({ detailer, onClick }: GigCardProps) {
         <div className="flex items-center gap-1 mb-3">
           <DollarSign className="w-4 h-4 text-gray-600" />
           <span className="text-sm font-medium text-gray-700">{detailer.priceRange}</span>
+        </div>
+
+        {/* Avg Response Time & Social Icons */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-1 text-sm text-green-600">
+            <Clock className="w-4 h-4" />
+            <span>{responseTime} min avg</span>
+          </div>
+          {socialLinks.length > 0 && (
+            <div className="flex items-center gap-1">
+              {socialLinks.map((link) => {
+                const Icon = SOCIAL_ICONS[link.platform];
+                const label = link.platform.charAt(0).toUpperCase() + link.platform.slice(1);
+                return (
+                  <button
+                    key={link.platform}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.open(link.url, '_blank', 'noopener,noreferrer');
+                    }}
+                    title={`Visit ${label}`}
+                    className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+                  >
+                    <Icon className="w-4 h-4 text-gray-600" />
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Services */}

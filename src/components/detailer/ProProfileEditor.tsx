@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Save, Eye, Upload, Plus, X, Trash2, GripVertical, MapPin, Clock, Phone } from 'lucide-react';
+import { toast } from 'sonner';
 import { SocialIcons } from './SocialIcons';
 import { SocialPreviewModal } from './SocialPreviewModal';
 import { DealerImageManager } from './DealerImageManager';
@@ -89,7 +90,12 @@ export function ProProfileEditor({ onNavigate }: ProProfileEditorProps = {}) {
   };
 
   const handleSave = () => {
-    alert('Profile saved successfully!');
+    toast.success('Profile saved successfully!');
+    if (onNavigate) {
+      onNavigate('settings');
+    } else {
+      navigate('/settings');
+    }
   };
 
   const handlePreview = () => {

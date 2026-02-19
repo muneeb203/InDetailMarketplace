@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Edit3, 
   MapPin, 
@@ -20,6 +20,8 @@ import { cn } from '../ui/utils';
 import { ExposureMetrics } from './ExposureMetrics';
 import { useAuth } from '../../context/AuthContext';
 import { useDealerProfile } from '../../hooks/useDealerProfile';
+import { getDealerCompletedOrdersCount } from '../../services/orderService';
+import { fetchDealerRating } from '../../services/dealerReviewService';
 
 interface DetailerProfileHomeProps {
   onNavigate?: (view: string, params?: any) => void;
@@ -32,6 +34,20 @@ export function DetailerProfileHome({ onNavigate }: DetailerProfileHomeProps) {
   );
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [showTipsModal, setShowTipsModal] = useState(false);
+  const [completedJobs, setCompletedJobs] = useState<number>(0);
+  const [dealerRating, setDealerRating] = useState<{ rating: number; review_count: number } | null>(null);
+
+  useEffect(() => {
+    if (currentUser?.role === 'detailer' && currentUser.id) {
+      getDealerCompletedOrdersCount(currentUser.id).then(setCompletedJobs);
+    }
+  }, [currentUser?.id, currentUser?.role]);
+
+  useEffect(() => {
+    if (currentUser?.role === 'detailer' && currentUser.id) {
+      fetchDealerRating(currentUser.id).then(setDealerRating).catch(() => setDealerRating(null));
+    }
+  }, [currentUser?.id, currentUser?.role]);
 
   const serviceRadius = dealerProfile?.service_radius_miles ?? (dealerProfile?.services_offered as { serviceRadius?: number })?.serviceRadius ?? 10;
 
@@ -40,8 +56,8 @@ export function DetailerProfileHome({ onNavigate }: DetailerProfileHomeProps) {
     shopName: dealerProfile?.business_name ?? 'Elite Auto Detailing',
     tagline: 'Perfection in every detail',
     bio: dealerProfile?.bio ?? 'Premium mobile auto detailing with 10+ years of experience. Specializing in luxury vehicles and paint correction.',
-    rating: 4.9,
-    jobCount: 247,
+    rating: dealerRating?.rating ?? 0,
+    jobCount: completedJobs,
     accountBalance: 3456.50,
     pendingEarnings: 875.00,
     thisMonthEarnings: 8234.00,
@@ -143,7 +159,7 @@ export function DetailerProfileHome({ onNavigate }: DetailerProfileHomeProps) {
   };
 
   const handleEditProfile = () => {
-    onNavigate?.('pro-profile-editor', { tab: 'brand' });
+    onNavigate?.('settings', { tab: 'profile' });
   };
 
   const handleViewAllLeads = () => {

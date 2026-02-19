@@ -19,13 +19,15 @@ import {
   Eye,
   BadgeCheck,
   Sparkles,
-  Bookmark
+  Bookmark,
+  Clock
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { trackProfileView, toggleDealerSave, getPublicDealerStats, isDealerSavedByClient } from '../services/exposureService';
+import { fetchDealerSocialLinks, type SocialPlatform } from '../services/dealerSocialService';
+import { fetchDealerReviews, fetchDealerRating } from '../services/dealerReviewService';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { BeforeAfterCarousel } from './BeforeAfterCarousel';
-import { SocialFeedModal } from './SocialFeedModal';
 import { TrustCuesBadge } from './TrustCuesBadge';
 
 interface DetailerProfileEnhancedPublicProps {
@@ -42,7 +44,9 @@ export function DetailerProfileEnhancedPublic({
   onMessage,
 }: DetailerProfileEnhancedPublicProps) {
   const { currentUser } = useAuth();
-  const [selectedSocial, setSelectedSocial] = useState<any>(null);
+  const [dealerSocialLinks, setDealerSocialLinks] = useState<{ platform: SocialPlatform; url: string }[]>([]);
+  const [reviews, setReviews] = useState<{ id: string; rating: number; review_text: string | null; created_at: string; client_name: string }[]>([]);
+  const [dealerRating, setDealerRating] = useState<{ rating: number; review_count: number } | null>(null);
   const [videoPlaying, setVideoPlaying] = useState(false);
   const [publicStats, setPublicStats] = useState<{ profile_views: number; saves: number } | null>(null);
   const [isSaved, setIsSaved] = useState(false);
@@ -65,6 +69,19 @@ export function DetailerProfileEnhancedPublic({
     }
   }, [detailer.id, currentUser?.id, currentUser?.role]);
 
+  // Fetch dealer social links for gig page
+  useEffect(() => {
+    fetchDealerSocialLinks(detailer.id)
+      .then((rows) => setDealerSocialLinks(rows.map((r) => ({ platform: r.platform, url: r.url }))))
+      .catch(() => setDealerSocialLinks([]));
+  }, [detailer.id]);
+
+  // Fetch dealer reviews and rating
+  useEffect(() => {
+    fetchDealerReviews(detailer.id).then(setReviews).catch(() => setReviews([]));
+    fetchDealerRating(detailer.id).then(setDealerRating).catch(() => setDealerRating(null));
+  }, [detailer.id]);
+
   const handleSaveToggle = async () => {
     if (currentUser?.role !== 'client') return;
     const saved = await toggleDealerSave(detailer.id, currentUser.id);
@@ -72,30 +89,9 @@ export function DetailerProfileEnhancedPublic({
     setPublicStats((s) => s ? { ...s, saves: s.saves + (saved ? 1 : -1) } : { profile_views: 0, saves: saved ? 1 : 0 });
   };
 
-  // Mock social connections if not provided
-  const mockSocialConnections = detailer.socialConnections || [
-    {
-      platform: 'instagram' as const,
-      username: 'autodetailing',
-      url: 'https://instagram.com',
-      isConnected: true,
-      followerCount: 12500,
-    },
-    {
-      platform: 'tiktok' as const,
-      username: 'detailingpro',
-      url: 'https://tiktok.com',
-      isConnected: true,
-      followerCount: 8900,
-    },
-    {
-      platform: 'youtube' as const,
-      username: 'DetailingChannel',
-      url: 'https://youtube.com',
-      isConnected: true,
-      followerCount: 5400,
-    },
-  ];
+  const handleSocialClick = (url: string) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
 
   // Mock before/after photos
   const mockBeforeAfterPhotos = detailer.beforeAfterPhotos || [
@@ -119,34 +115,6 @@ export function DetailerProfileEnhancedPublic({
       afterUrl: 'https://images.unsplash.com/photo-1607860108855-64acf2078ed9?w=600&q=80',
       category: 'Engine Bay',
       description: 'Engine detailing and protection',
-    },
-  ];
-
-  // Mock reviews data
-  const mockReviews = [
-    {
-      id: '1',
-      rating: 5,
-      comment: 'Absolutely amazing work! My car looks brand new. The attention to detail is incredible.',
-      author: 'Sarah M.',
-      date: '2 weeks ago',
-      tags: ['on time', 'great communication', 'thorough'],
-    },
-    {
-      id: '2',
-      rating: 5,
-      comment: 'Best detailing service I\'ve ever used. Professional, friendly, and worth every penny.',
-      author: 'Mike R.',
-      date: '1 month ago',
-      tags: ['professional', 'great interior', 'pet hair removal'],
-    },
-    {
-      id: '3',
-      rating: 5,
-      comment: 'The ceramic coating has made such a difference. Water just beads right off!',
-      author: 'Jennifer K.',
-      date: '6 weeks ago',
-      tags: ['ceramic coating', 'long-lasting', 'great value'],
     },
   ];
 
@@ -268,8 +236,8 @@ export function DetailerProfileEnhancedPublic({
           <div className="flex items-center gap-4 pt-4 border-t border-gray-200">
             <div className="flex items-center gap-1">
               <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
-              <span className="font-medium">{detailer.rating.toFixed(1)}</span>
-              <span className="text-gray-500 text-sm">({detailer.reviewCount || 0} reviews)</span>
+              <span className="font-medium">{(dealerRating?.rating ?? detailer.rating ?? 0).toFixed(1)}</span>
+              <span className="text-gray-500 text-sm">({dealerRating?.review_count ?? detailer.reviewCount ?? 0} reviews)</span>
             </div>
             <span className="text-gray-300">|</span>
             <div className="flex items-center gap-1 text-gray-600">
@@ -285,8 +253,8 @@ export function DetailerProfileEnhancedPublic({
           </div>
         </Card>
 
-        {/* Social Strip */}
-        {mockSocialConnections.length > 0 && (
+        {/* Social Strip - only show when dealer has social links */}
+        {dealerSocialLinks.length > 0 && (
           <Card className="mx-4 mb-4 p-4">
             <div className="flex items-center gap-2 mb-3">
               <h4>Follow Us</h4>
@@ -295,16 +263,18 @@ export function DetailerProfileEnhancedPublic({
               </Badge>
             </div>
             <div className="flex gap-2 overflow-x-auto pb-2">
-              {mockSocialConnections.map((social) => {
+              {dealerSocialLinks.map((social) => {
                 const Icon = getSocialIcon(social.platform);
+                const label = social.platform.charAt(0).toUpperCase() + social.platform.slice(1);
                 return (
                   <Button
                     key={social.platform}
-                    onClick={() => setSelectedSocial(social)}
-                    className={`flex-shrink-0 gap-2 ${getSocialPlatformColor(social.platform)} text-white`}
+                    onClick={() => handleSocialClick(social.url)}
+                    title={`Visit ${label}`}
+                    className={`flex-shrink-0 gap-2 ${getSocialPlatformColor(social.platform)} text-white transition-transform hover:scale-105`}
                   >
                     <Icon className="w-5 h-5" />
-                    {social.platform === 'google-business' ? 'Google' : social.platform.charAt(0).toUpperCase() + social.platform.slice(1)}
+                    {label}
                   </Button>
                 );
               })}
@@ -389,43 +359,39 @@ export function DetailerProfileEnhancedPublic({
             <h3>Reviews & Highlights</h3>
             <div className="flex items-center gap-2">
               <Star className="w-6 h-6 fill-amber-400 text-amber-400" />
-              <span className="text-2xl font-medium">{detailer.rating.toFixed(1)}</span>
+              <span className="text-2xl font-medium">{(dealerRating?.rating ?? detailer.rating ?? 0).toFixed(1)}</span>
               <span className="text-gray-500">/ 5</span>
+              <span className="text-gray-500 text-sm">({dealerRating?.review_count ?? detailer.reviewCount ?? 0} reviews)</span>
             </div>
           </div>
 
-          {/* Review Keywords */}
-          <div className="flex flex-wrap gap-2 mb-4">
-            {['on time', 'thorough', 'great communication', 'professional', 'great value'].map((tag) => (
-              <Badge key={tag} variant="secondary" className="bg-green-50 text-green-700 border-0">
-                {tag}
-              </Badge>
-            ))}
-          </div>
-
-          {/* Top Reviews */}
+          {/* Reviews from dealer_reviews */}
           <div className="space-y-3">
-            {mockReviews.slice(0, 2).map((review) => (
-              <div key={review.id} className="p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="flex">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`w-4 h-4 ${
-                          i < review.rating
-                            ? 'fill-amber-400 text-amber-400'
-                            : 'text-gray-300'
-                        }`}
-                      />
-                    ))}
+            {reviews.length > 0 ? (
+              reviews.slice(0, 10).map((review) => (
+                <div key={review.id} className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="flex">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star
+                          key={star}
+                          className={`w-4 h-4 ${
+                            star <= review.rating ? 'fill-amber-400 text-amber-400' : 'text-gray-300'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-sm text-gray-500">
+                      • {new Date(review.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
                   </div>
-                  <span className="text-sm text-gray-500">• {review.date}</span>
+                  {review.review_text && <p className="text-sm text-gray-700 mb-2">{review.review_text}</p>}
+                  <p className="text-sm font-medium text-gray-600">- {review.client_name}</p>
                 </div>
-                <p className="text-sm text-gray-700 mb-2">{review.comment}</p>
-                <p className="text-sm font-medium text-gray-600">- {review.author}</p>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-sm text-gray-500 py-4 text-center">No reviews yet.</p>
+            )}
           </div>
         </Card>
 
@@ -507,14 +473,6 @@ export function DetailerProfileEnhancedPublic({
         </div>
       </div>
 
-      {/* Social Feed Modal */}
-      {selectedSocial && (
-        <SocialFeedModal
-          open={!!selectedSocial}
-          onOpenChange={(open) => !open && setSelectedSocial(null)}
-          connection={selectedSocial}
-        />
-      )}
     </div>
   );
 }

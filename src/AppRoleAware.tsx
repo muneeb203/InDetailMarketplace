@@ -21,7 +21,6 @@ import { DetailerProfileEnhancedPublic } from "./components/DetailerProfileEnhan
 import { OrderPlacementModal } from "./components/OrderPlacementModal";
 import { ClientOrdersPage } from "./components/ClientOrdersPage";
 import { ProDashboard } from "./components/detailer/ProDashboard";
-import { ProProfileEditor } from "./components/detailer/ProProfileEditor";
 import { ProPublicProfile } from "./components/detailer/ProPublicProfile";
 import { ProLeadInbox } from "./components/detailer/ProLeadInbox";
 import { DealerOrdersQueue } from "./components/detailer/DealerOrdersQueue";
@@ -420,8 +419,8 @@ export default function AppRoleAware() {
     const viewMap: Record<string, View> = {
       'pro-dashboard': 'pro-dashboard',
       'dashboard': 'pro-dashboard',
-      'pro-profile-editor': 'pro-profile-editor',
-      'profile-editor': 'pro-profile-editor',
+      'pro-profile-editor': 'settings',
+      'profile-editor': 'settings',
       'pro-public-profile': 'pro-public-profile',
       'public-profile': 'pro-public-profile',
       'pro-lead-inbox': 'pro-lead-inbox',
@@ -690,7 +689,6 @@ export default function AppRoleAware() {
     "job-status",
     "detailer-profile", 
     "request-quote",
-    "pro-profile-editor",
     "pro-public-profile",
     "pro-lead-inbox",
     "orders-queue"
@@ -754,17 +752,9 @@ export default function AppRoleAware() {
           <ProDashboard onNavigate={handleProNavigate} />
         )}
 
-      {/* PRO Profile Editor */}
-      {currentView === "pro-profile-editor" &&
-        currentUser.role === "detailer" && (
-          <div className="h-full overflow-hidden">
-            <ProProfileEditor onNavigate={handleProNavigate} />
-          </div>
-        )}
-
       {/* PRO Public Profile (Preview for detailer) */}
       {currentView === "pro-public-profile" && (
-          <div className="h-full overflow-hidden">
+          <div className="h-full flex flex-col min-h-0">
             <ProPublicProfile onNavigate={handleProNavigate} />
           </div>
         )}

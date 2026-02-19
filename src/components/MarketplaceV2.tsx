@@ -1,17 +1,18 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Detailer } from '../types';
 import { 
   Search, MapPin, Star, SlidersHorizontal, Navigation, Map, List, 
-  Clock, CheckCircle2, Award, Image as ImageIcon 
+  Clock, CheckCircle2, Award, Image as ImageIcon, Instagram, Facebook 
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { TrustBadges } from './TrustBadges';
 import { DetailerCardSkeleton } from './ui/skeleton-card';
 import { rankDetailers } from '../lib/ranking';
+import { fetchDealerSocialLinks, type SocialPlatform } from '../services/dealerSocialService';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { motion, AnimatePresence } from 'motion/react';
 import { ScrollArea } from './ui/scroll-area';
@@ -373,6 +374,17 @@ function ListView({
   );
 }
 
+// TikTok icon (not in lucide)
+function TikTokIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-5.2 1.74 2.89 2.89 0 012.31-4.64 2.93 2.93 0 01.88.13V9.4a6.84 6.84 0 00-1-.05A6.33 6.33 0 005 20.1a6.34 6.34 0 0010.86-4.43v-7a8.16 8.16 0 004.77 1.52v-3.4a4.85 4.85 0 01-1-.1z" />
+    </svg>
+  );
+}
+
+const SOCIAL_ICONS = { instagram: Instagram, tiktok: TikTokIcon, facebook: Facebook } as const;
+
 // Enhanced Detailer Card with Portfolio Carousel
 function DetailerCard({
   detailer,
@@ -386,6 +398,14 @@ function DetailerCard({
   onRequestQuote: (detailer: Detailer) => void;
 }) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [socialLinks, setSocialLinks] = useState<{ platform: SocialPlatform; url: string }[]>([]);
+
+  useEffect(() => {
+    fetchDealerSocialLinks(detailer.id)
+      .then((rows) => setSocialLinks(rows.map((r) => ({ platform: r.platform, url: r.url }))))
+      .catch(() => setSocialLinks([]));
+  }, [detailer.id]);
+
   const logoOrAvatar = detailer.logo ?? detailer.avatar;
   const portfolioPhotos = detailer.portfolioPhotos || detailer.photos || [];
   const displayPhotos = portfolioPhotos.length > 0
@@ -490,6 +510,28 @@ function DetailerCard({
                 <span className="text-xs">{responseTime}</span>
               </div>
             </div>
+            {/* Social icons - below response time */}
+            {socialLinks.length > 0 && (
+              <div className="flex items-center gap-2 mt-2">
+                {socialLinks.map((link) => {
+                  const Icon = SOCIAL_ICONS[link.platform];
+                  const label = link.platform.charAt(0).toUpperCase() + link.platform.slice(1);
+                  return (
+                    <button
+                      key={link.platform}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.open(link.url, '_blank', 'noopener,noreferrer');
+                      }}
+                      title={`Visit ${label}`}
+                      className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+                    >
+                      <Icon className="w-4 h-4 text-gray-600" />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 

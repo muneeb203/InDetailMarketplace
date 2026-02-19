@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Calendar, Clock, MapPin, MessageSquare, Car, Phone, Mail, Sparkles, Loader2 } from 'lucide-react';
+import { Calendar, Clock, MapPin, MessageSquare, Car, Phone, Mail, Sparkles, Loader2, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useClientBookings, type BookingDisplay } from '../hooks/useClientBookings';
+import { getOrderIdsWithReviews } from '../services/dealerReviewService';
+import { ReviewModal } from './ReviewModal';
 import { toast } from 'sonner';
 
 type Booking = BookingDisplay;
@@ -55,8 +57,21 @@ export function BookingsPageIntegrated({
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [bookingToCancel, setBookingToCancel] = useState<Booking | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [reviewModalBooking, setReviewModalBooking] = useState<Booking | null>(null);
+  const [orderIdsWithReviews, setOrderIdsWithReviews] = useState<Set<string>>(new Set());
 
-  const { bookings, loading, cancelOrder } = useClientBookings(clientId);
+  const { bookings, loading, cancelOrder, refetch } = useClientBookings(clientId);
+
+  // Fetch which completed orders have reviews
+  const completedOrderIds = bookings.filter((b) => b.status === 'completed').map((b) => b.orderId);
+  const completedIdsKey = [...completedOrderIds].sort().join(',');
+  useEffect(() => {
+    if (completedOrderIds.length > 0) {
+      getOrderIdsWithReviews(completedOrderIds).then(setOrderIdsWithReviews);
+    } else {
+      setOrderIdsWithReviews(new Set());
+    }
+  }, [completedIdsKey]);
 
   const handleCancelBooking = async (bookingId: string) => {
     setCancelling(true);
@@ -205,13 +220,30 @@ export function BookingsPageIntegrated({
                         </div>
 
                         {/* Actions */}
-                        <div className="flex gap-2 pt-1">
+                        <div className="flex gap-2 pt-1 flex-wrap">
+                          {booking.status === 'completed' && (
+                            orderIdsWithReviews.has(booking.orderId) ? (
+                              <Button variant="outline" size="sm" className="h-8 text-xs" disabled>
+                                <Star className="w-3 h-3 mr-1 fill-amber-400 text-amber-400" />
+                                Review Submitted
+                              </Button>
+                            ) : (
+                              <Button
+                                onClick={() => setReviewModalBooking(booking)}
+                                size="sm"
+                                className="h-8 text-xs bg-amber-500 hover:bg-amber-600 text-white"
+                              >
+                                <Star className="w-3 h-3 mr-1" />
+                                Leave Review
+                              </Button>
+                            )
+                          )}
                           {booking.status !== 'cancelled' && booking.status !== 'completed' && (
                             <Button
                               onClick={() => onViewStatus?.(booking.id)}
                               variant="outline"
                               size="sm"
-                              className="flex-1 h-8 text-xs border-[#0078FF] text-[#0078FF] hover:bg-[#0078FF] hover:text-white"
+                              className="h-8 text-xs border-[#0078FF] text-[#0078FF] hover:bg-[#0078FF] hover:text-white"
                             >
                               View Status
                             </Button>
@@ -220,7 +252,7 @@ export function BookingsPageIntegrated({
                             onClick={() => setSelectedBooking(booking)}
                             variant="outline"
                             size="sm"
-                            className="flex-1 h-8 text-xs"
+                            className="h-8 text-xs"
                           >
                             Details
                           </Button>
@@ -229,7 +261,7 @@ export function BookingsPageIntegrated({
                               onClick={() => onNavigateToMessages?.({ bookingId: booking.id, dealerId: booking.dealerId })}
                               variant="outline"
                               size="sm"
-                              className="flex-1 h-8 text-xs"
+                              className="h-8 text-xs"
                             >
                               <MessageSquare className="w-3 h-3 mr-1" />
                               Message
@@ -388,15 +420,48 @@ export function BookingsPageIntegrated({
                   </>
                 )}
                 {selectedBooking.status === 'completed' && (
-                  <Button size="sm" className="flex-1 bg-[#0078FF] hover:bg-[#0056CC] text-white h-9 text-xs">
-                    Book Again
-                  </Button>
+                  <>
+                    {orderIdsWithReviews.has(selectedBooking.orderId) ? (
+                      <Button size="sm" variant="outline" className="flex-1 h-9 text-xs" disabled>
+                        <Star className="w-3 h-3 mr-1 fill-amber-400 text-amber-400" />
+                        Review Submitted
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() => {
+                          setSelectedBooking(null);
+                          setReviewModalBooking(selectedBooking);
+                        }}
+                        size="sm"
+                        className="flex-1 bg-amber-500 hover:bg-amber-600 text-white h-9 text-xs"
+                      >
+                        <Star className="w-3 h-3 mr-1" />
+                        Leave Review
+                      </Button>
+                    )}
+                  </>
                 )}
               </div>
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Review Modal */}
+      {reviewModalBooking && clientId && (
+        <ReviewModal
+          open={!!reviewModalBooking}
+          onOpenChange={(open) => !open && setReviewModalBooking(null)}
+          orderId={reviewModalBooking.orderId}
+          dealerId={reviewModalBooking.dealerId}
+          clientId={clientId}
+          dealerName={reviewModalBooking.detailerName}
+          onSuccess={() => {
+            setOrderIdsWithReviews((prev) => new Set([...prev, reviewModalBooking.orderId]));
+            refetch?.();
+          }}
+        />
+      )}
 
       {/* Cancel Confirmation Dialog */}
       <AlertDialog open={!!bookingToCancel} onOpenChange={() => setBookingToCancel(null)}>

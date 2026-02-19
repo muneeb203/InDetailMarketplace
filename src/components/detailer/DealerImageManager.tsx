@@ -76,10 +76,7 @@ export function DealerImageManager({
     fetchProfile();
   }, [fetchProfile]);
 
-  useEffect(() => {
-    onLogoChange?.(logoUrl);
-  }, [logoUrl, onLogoChange]);
-
+  // Notify parent only when logo changes from user upload (not on initial load)
   useEffect(() => {
     onPortfolioChange?.(portfolioImages);
   }, [portfolioImages, onPortfolioChange]);
@@ -109,6 +106,7 @@ export function DealerImageManager({
       const url = await uploadLogo(userId, file);
       setLogoUrl(url);
       setLogoPreview(null);
+      onLogoChange?.(url);
       toast.success('Logo updated successfully');
     } catch (err: any) {
       const msg = err?.message ?? 'Failed to upload logo';

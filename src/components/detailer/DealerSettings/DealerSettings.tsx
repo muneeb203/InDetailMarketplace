@@ -21,7 +21,7 @@ import { PortfolioSection } from './PortfolioSection';
 import { LocationSection } from './LocationSection';
 import { BusinessDetailsSection } from './BusinessDetailsSection';
 import { AccountSecuritySection } from './AccountSecuritySection';
-import { SocialSection } from './SocialSection';
+import { SocialProfilesSection } from './SocialProfilesSection';
 import { PromotionsSection } from './PromotionsSection';
 
 interface DealerSettingsProps {
@@ -166,7 +166,7 @@ export function DealerSettings({ onNavigate, initialTab }: DealerSettingsProps) 
         </TabsContent>
 
         <TabsContent value="social" className="mt-6">
-          <SocialSection userId={userId!} data={data} onUpdate={updateLocal} />
+          <SocialProfilesSection dealerId={userId!} />
         </TabsContent>
 
         <TabsContent value="promotions" className="mt-6">

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
@@ -53,6 +53,11 @@ export function ProfileInfoSection({ userId, data, onUpdate }: ProfileInfoSectio
       (data.comm_preference ?? 'voice-chat') !== commPreference;
     setHasChanges(changed);
   }, [businessName, bio, certifications, yearsInBusiness, commPreference, data]);
+
+  const handleLogoChange = useCallback(
+    (url: string | null) => onUpdate({ logo_url: url }),
+    [onUpdate]
+  );
 
   const handleSave = async () => {
     if (!hasChanges) return;
@@ -123,7 +128,7 @@ export function ProfileInfoSection({ userId, data, onUpdate }: ProfileInfoSectio
             <DealerImageManager
               userId={userId}
               showPortfolio={false}
-              onLogoChange={(url) => onUpdate({ logo_url: url })}
+              onLogoChange={handleLogoChange}
             />
           </div>
           <div className="space-y-2">

@@ -76,6 +76,17 @@ export async function fetchDealerOrders(dealerId: string): Promise<Order[]> {
   return orders;
 }
 
+export async function getDealerCompletedOrdersCount(dealerId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('orders')
+    .select('*', { count: 'exact', head: true })
+    .eq('dealer_id', dealerId)
+    .eq('status', 'completed');
+
+  if (error) return 0;
+  return count ?? 0;
+}
+
 export async function fetchDealerUpcomingOrders(dealerId: string): Promise<Order[]> {
   const { data, error } = await supabase
     .from('orders')

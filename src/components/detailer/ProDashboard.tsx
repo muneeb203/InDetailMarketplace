@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Share2, Lightbulb, X } from 'lucide-react';
 import { BrandHeader } from './BrandHeader';
 import { ExposureMetrics } from './ExposureMetrics';
@@ -12,6 +12,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useDealerProfile } from '../../hooks/useDealerProfile';
 import { useExposureMetrics } from '../../hooks/useExposureMetrics';
 import { useUpcomingBookings } from '../../hooks/useUpcomingBookings';
+import { getDealerCompletedOrdersCount } from '../../services/orderService';
+import { fetchDealerRating } from '../../services/dealerReviewService';
 
 interface ProDashboardProps {
   onNavigate?: (view: string, params?: any) => void;
@@ -29,6 +31,20 @@ export function ProDashboard({ onNavigate }: ProDashboardProps) {
   );
   const [showSharePanel, setShowSharePanel] = useState(false);
   const [showTipsModal, setShowTipsModal] = useState(false);
+  const [completedJobs, setCompletedJobs] = useState<number>(0);
+  const [dealerRating, setDealerRating] = useState<{ rating: number; review_count: number } | null>(null);
+
+  useEffect(() => {
+    if (currentUser?.role === 'detailer' && currentUser.id) {
+      getDealerCompletedOrdersCount(currentUser.id).then(setCompletedJobs);
+    }
+  }, [currentUser?.id, currentUser?.role]);
+
+  useEffect(() => {
+    if (currentUser?.role === 'detailer' && currentUser.id) {
+      fetchDealerRating(currentUser.id).then(setDealerRating).catch(() => setDealerRating(null));
+    }
+  }, [currentUser?.id, currentUser?.role]);
 
   const serviceRadius = dealerProfile?.service_radius_miles ?? (dealerProfile?.services_offered as { serviceRadius?: number })?.serviceRadius ?? 10;
   const dealerServices = (dealerProfile?.services_offered as { specialties?: string[] })?.specialties ?? [];
@@ -40,8 +56,8 @@ export function ProDashboard({ onNavigate }: ProDashboardProps) {
     city: dealerProfile?.base_location ?? 'Set your location',
     radiusBadge: `${serviceRadius} mi radius`,
     badges: { verified: true, insured: true },
-    rating: 4.9,
-    jobCount: 247,
+    rating: dealerRating?.rating ?? 0,
+    jobCount: completedJobs,
     serviceTags: dealerServices,
   };
 

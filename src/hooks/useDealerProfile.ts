@@ -18,7 +18,6 @@ export interface DealerProfileData {
   operating_hours?: Record<string, { isOpen: boolean; open: string; close: string }>;
   is_insured?: boolean;
   is_pro?: boolean;
-  social_handles?: Record<string, string>;
   promo?: { title?: string; description?: string; startDate?: string; endDate?: string; active?: boolean };
   [key: string]: unknown;
 }
@@ -62,7 +61,6 @@ export function useDealerProfile(userId: string | undefined) {
         operating_hours: profile?.operating_hours ?? undefined,
         is_insured: profile?.is_insured ?? false,
         is_pro: profile?.is_pro ?? false,
-        social_handles: (profile?.social_handles as Record<string, string>) ?? undefined,
         promo: (profile?.promo as Record<string, unknown>) ?? undefined,
       });
     } catch (err) {

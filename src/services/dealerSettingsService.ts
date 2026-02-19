@@ -33,10 +33,6 @@ export interface ServiceRadiusUpdate {
   service_radius_miles: number;
 }
 
-export interface SocialHandlesUpdate {
-  social_handles?: Record<string, string>;
-}
-
 export interface PromoUpdate {
   promo?: { title?: string; description?: string; startDate?: string; endDate?: string; active?: boolean };
 }
@@ -48,7 +44,6 @@ export async function updateDealerProfile(
     | LocationUpdate
     | BusinessDetailsUpdate
     | ServiceRadiusUpdate
-    | SocialHandlesUpdate
     | PromoUpdate
 ) {
   const { error } = await supabase
