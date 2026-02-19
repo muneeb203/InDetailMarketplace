@@ -1,46 +1,65 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ClientJobStatusPage } from './ClientJobStatusPage';
 import { DetailerJobStatusPage } from './DetailerJobStatusPage';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
-import { Calendar, Clock, DollarSign, Activity } from 'lucide-react';
+import { Calendar, Clock, DollarSign, Activity, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { fetchDealerUpcomingOrders, fetchClientUpcomingOrders } from '../services/orderService';
+import type { Order } from '../types';
 
 interface StatusCenterProps {
   role: 'client' | 'detailer';
-  onNavigateToMessages?: () => void;
+  userId?: string;
+  onNavigateToMessages?: (params?: { dealerId?: string }) => void;
 }
 
-interface MockBooking {
+type DisplayStatus = 'requested' | 'accepted' | 'on-the-way' | 'started' | 'completed';
+
+interface BookingItem {
   id: string;
   serviceType: string;
   date: string;
   time: string;
-  status: 'requested' | 'accepted' | 'on-the-way' | 'started' | 'completed';
+  status: DisplayStatus;
   price: number;
   clientOrDetailerName: string;
+  dealerId?: string;
+  clientId?: string;
 }
 
-const mockActiveBookings: MockBooking[] = [
-  {
-    id: 'BK-2025-001',
-    serviceType: 'Premium Interior & Exterior Detail',
-    date: 'Oct 20, 2025',
-    time: '2:00 PM',
-    status: 'on-the-way',
-    price: 189,
-    clientOrDetailerName: 'Mike Johnson',
-  },
-  {
-    id: 'BK-2025-002',
-    serviceType: 'Ceramic Coating Application',
-    date: 'Oct 22, 2025',
-    time: '10:00 AM',
-    status: 'accepted',
-    price: 599,
-    clientOrDetailerName: 'Sarah Martinez',
-  },
-];
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return 'TBD';
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function mapOrderToBookingItem(order: Order, role: 'client' | 'detailer'): BookingItem {
+  const statusMap: Record<string, DisplayStatus> = {
+    accepted: 'accepted',
+    paid: 'accepted',
+    in_progress: 'started',
+  };
+  const status = statusMap[order.status] ?? 'accepted';
+  const serviceType = order.notes?.slice(0, 50) ?? 'Detailing Service';
+  const price = order.agreed_price ?? order.proposed_price;
+  const clientOrDetailerName =
+    role === 'detailer'
+      ? (order.client?.name ?? 'Client')
+      : (order.dealer?.business_name ?? 'Detailer');
+
+  return {
+    id: order.id,
+    serviceType: serviceType + (order.notes && order.notes.length > 50 ? '…' : ''),
+    date: formatDate(order.scheduled_date),
+    time: 'TBD',
+    status,
+    price,
+    clientOrDetailerName,
+    dealerId: order.dealer_id,
+    clientId: order.client_id,
+  };
+}
 
 const statusConfig = {
   requested: {
@@ -70,22 +89,52 @@ const statusConfig = {
   },
 };
 
-export function StatusCenter({ role, onNavigateToMessages }: StatusCenterProps) {
+export function StatusCenter({ role, userId, onNavigateToMessages }: StatusCenterProps) {
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  const [bookings, setBookings] = useState<BookingItem[]>([]);
+  const [loading, setLoading] = useState(!!userId);
+
+  const fetchBookings = useCallback(async () => {
+    if (!userId) {
+      setBookings([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const orders =
+        role === 'detailer'
+          ? await fetchDealerUpcomingOrders(userId)
+          : await fetchClientUpcomingOrders(userId);
+      setBookings(orders.map((o) => mapOrderToBookingItem(o, role)));
+    } catch {
+      setBookings([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, role]);
+
+  useEffect(() => {
+    fetchBookings();
+  }, [fetchBookings]);
 
   // If a specific booking is selected, show the detailed status page
   if (selectedBookingId) {
+    const selectedBooking = bookings.find((b) => b.id === selectedBookingId);
+    const messageParams = role === 'client'
+      ? { dealerId: selectedBooking?.dealerId }
+      : undefined;
     return role === 'client' ? (
       <ClientJobStatusPage
         bookingId={selectedBookingId}
         onBack={() => setSelectedBookingId(null)}
-        onNavigateToMessages={onNavigateToMessages}
+        onNavigateToMessages={onNavigateToMessages ? () => onNavigateToMessages(messageParams) : undefined}
       />
     ) : (
       <DetailerJobStatusPage
         bookingId={selectedBookingId}
         onBack={() => setSelectedBookingId(null)}
-        onNavigateToMessages={onNavigateToMessages}
+        onNavigateToMessages={onNavigateToMessages ? () => onNavigateToMessages() : undefined}
       />
     );
   }
@@ -116,8 +165,13 @@ export function StatusCenter({ role, onNavigateToMessages }: StatusCenterProps) 
           {/* Active Bookings */}
           <div>
             <h2 className="text-sm mb-3 px-1">Active Jobs</h2>
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+              </div>
+            ) : (
             <div className="space-y-3">
-              {mockActiveBookings.map((booking, index) => (
+              {bookings.map((booking, index) => (
                 <motion.div
                   key={booking.id}
                   initial={{ opacity: 0, y: 10 }}
@@ -175,10 +229,11 @@ export function StatusCenter({ role, onNavigateToMessages }: StatusCenterProps) 
                 </motion.div>
               ))}
             </div>
+            )}
           </div>
 
           {/* Empty State for no active jobs */}
-          {mockActiveBookings.length === 0 && (
+          {!loading && bookings.length === 0 && (
             <div className="text-center py-12">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <Activity className="w-8 h-8 text-gray-400" />

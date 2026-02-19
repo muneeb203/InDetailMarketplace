@@ -102,6 +102,21 @@ export async function fetchDealerUpcomingOrders(dealerId: string): Promise<Order
   return orders;
 }
 
+export async function fetchClientUpcomingOrders(clientId: string): Promise<Order[]> {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('client_id', clientId)
+    .in('status', ['accepted', 'paid', 'in_progress'])
+    .order('scheduled_date', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  const orders = (data || []).map(mapRowToOrder);
+  await enrichOrdersWithDealer(orders);
+  return orders;
+}
+
 async function enrichOrdersWithDealer(orders: Order[]): Promise<void> {
   const ids = [...new Set(orders.map((o) => o.dealer_id))];
   if (ids.length === 0) return;
@@ -160,6 +175,22 @@ export async function updateOrderStatus(
 
   if (error) throw error;
   return mapRowToOrder(data);
+}
+
+/**
+ * Client accepts a countered offer via RPC (bypasses RLS for reliable client updates).
+ * Use this instead of updateOrderStatus when client accepts from 'countered' status.
+ */
+export async function clientAcceptCounter(orderId: string): Promise<Order> {
+  const { data, error } = await supabase.rpc('accept_client_counter', {
+    p_order_id: orderId,
+  });
+
+  if (error) throw error;
+  const row = data as Record<string, unknown>;
+  const order = mapRowToOrder(row);
+  const enriched = await enrichSingleOrderWithDealer(order);
+  return enriched ?? order;
 }
 
 export function subscribeToClientOrders(

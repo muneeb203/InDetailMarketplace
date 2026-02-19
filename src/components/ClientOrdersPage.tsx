@@ -6,7 +6,7 @@ import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { Loader2, Package, CheckCircle, XCircle, Clock, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
-import { updateOrderStatus, isAllowedClientTransition } from '../services/orderService';
+import { updateOrderStatus, clientAcceptCounter, isAllowedClientTransition } from '../services/orderService';
 
 interface ClientOrdersPageProps {
   clientId: string;
@@ -76,13 +76,12 @@ export function ClientOrdersPage({ clientId }: ClientOrdersPageProps) {
     if (!isAllowedClientTransition(order.status, 'accepted')) return;
     setUpdatingId(order.id);
     try {
-      const updated = await updateOrderStatus(order.id, 'accepted', {
-        agreed_price: order.agreed_price ?? order.proposed_price,
-      });
+      const updated = await clientAcceptCounter(order.id);
       mergeOrder(updated);
       toast.success('Offer accepted');
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Failed to accept');
+      const msg = err instanceof Error ? err.message : 'Failed to accept';
+      toast.error(msg);
     } finally {
       setUpdatingId(null);
     }

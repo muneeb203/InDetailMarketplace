@@ -1,5 +1,6 @@
-import React, { ReactNode, useState } from 'react';
+import React, { ReactNode, useState, useEffect } from 'react';
 import { Search, Bell, User, MessageSquare, Calendar, Activity, FileText, AlertCircle, Home, Settings, LogOut, Package } from 'lucide-react';
+import { Badge } from './ui/badge';
 import { ProfileSidebar } from './ProfileSidebar';
 import type { Vehicle } from '../types';
 
@@ -13,10 +14,12 @@ interface WebLayoutProps {
   userPhone?: string;
   userRole?: 'client' | 'detailer';
   clientId?: string;
+  dealerLogoUrl?: string | null;
   vehicles?: Vehicle[];
   showProfileSidebar?: boolean;
   onSearch?: (query: string) => void;
   onLogout?: () => void;
+  unreadMessages?: number;
 }
 
 export function WebLayout({ 
@@ -29,13 +32,20 @@ export function WebLayout({
   userPhone,
   userRole = "client",
   clientId,
+  dealerLogoUrl,
   vehicles = [],
   showProfileSidebar = true,
   onSearch,
   onLogout,
+  unreadMessages = 0,
 }: WebLayoutProps) {
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [logoError, setLogoError] = useState(false);
+
+  useEffect(() => {
+    setLogoError(false);
+  }, [dealerLogoUrl]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,8 +91,17 @@ export function WebLayout({
         <div className="flex items-center gap-8">
           {/* Logo */}
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-xl">S</span>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden bg-blue-600 flex-shrink-0">
+              {userRole === 'detailer' && dealerLogoUrl && !logoError ? (
+                <img
+                  src={dealerLogoUrl}
+                  alt="Logo"
+                  className="w-full h-full object-cover"
+                  onError={() => setLogoError(true)}
+                />
+              ) : (
+                <span className="text-white font-bold text-xl">S</span>
+              )}
             </div>
             <div>
               <p className="font-semibold text-gray-900">{displayName}</p>
@@ -135,24 +154,35 @@ export function WebLayout({
           >
             Status
           </button>
-          <button
-            onClick={() => onNavigate('profile')}
-            className={`text-sm font-medium transition-colors ${currentView === 'profile' ? 'text-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
-          >
-            Profile
-          </button>
+          {userRole === 'detailer' ? (
+            <button
+              onClick={() => onNavigate('pro-public-profile')}
+              className={`text-sm font-medium transition-colors ${currentView === 'pro-public-profile' ? 'text-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
+            >
+              View Gig
+            </button>
+          ) : (
+            <button
+              onClick={() => onNavigate('profile')}
+              className={`text-sm font-medium transition-colors ${currentView === 'profile' ? 'text-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
+            >
+              Profile
+            </button>
+          )}
           <button className="relative hover:opacity-80 transition-opacity">
             <Bell className="w-5 h-5 text-gray-600" />
             <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-xs text-white flex items-center justify-center">
               3
             </span>
           </button>
-          <button 
-            onClick={() => onNavigate('profile')}
-            className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300 transition-colors"
-          >
-            <User className="w-5 h-5 text-gray-600" />
-          </button>
+          {userRole === 'client' && (
+            <button 
+              onClick={() => onNavigate('profile')}
+              className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300 transition-colors"
+            >
+              <User className="w-5 h-5 text-gray-600" />
+            </button>
+          )}
         </div>
       </header>
 
@@ -210,7 +240,14 @@ export function WebLayout({
               }`}
               title="Messages"
             >
-              <MessageSquare className="w-5 h-5 flex-shrink-0" />
+              <div className="relative flex-shrink-0">
+                <MessageSquare className="w-5 h-5" />
+                {unreadMessages > 0 && (
+                  <Badge className="absolute -top-1.5 -right-1.5 min-w-[1.25rem] h-5 px-1 flex items-center justify-center bg-red-500 text-white text-xs border-0">
+                    {unreadMessages > 99 ? '99+' : unreadMessages}
+                  </Badge>
+                )}
+              </div>
               {isSidebarExpanded && (
                 <span className="font-medium whitespace-nowrap">
                   Messages

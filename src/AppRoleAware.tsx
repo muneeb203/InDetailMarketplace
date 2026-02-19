@@ -40,6 +40,8 @@ import { FileText, AlertCircle, ArrowLeft } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { DebugDataSource } from "./components/DebugDataSource";
 import { useAuth } from "./context/AuthContext";
+import { useDealerProfile } from "./hooks/useDealerProfile";
+import { useUnreadMessages } from "./hooks/useUnreadMessages";
 
 type View =
   | "welcome"
@@ -87,11 +89,21 @@ export default function AppRoleAware() {
   const [selectedDetailerId, setSelectedDetailerId] = useState<
     string | null
   >(null);
+  const [dealerIdToOpen, setDealerIdToOpen] = useState<string | null>(null);
+  const [viewingConversationId, setViewingConversationId] = useState<string | null>(null);
   const [proNavParams, setProNavParams] = useState<any>({});
   const [orderModalOpen, setOrderModalOpen] = useState(false);
   
   // Fetch real detailers from Supabase
   const { detailers, loading: detailersLoading, error: detailersError } = useDetailers();
+  const { data: dealerProfile } = useDealerProfile(
+    currentUser?.role === 'detailer' ? currentUser.id : undefined
+  );
+  const { unreadCount, markAsRead } = useUnreadMessages(
+    currentUser?.id,
+    currentUser?.role ?? 'client',
+    viewingConversationId
+  );
   
   // Log what we got from Supabase
   console.log('📊 Detailers from Supabase:', detailers.length, 'detailers');
@@ -516,6 +528,7 @@ export default function AppRoleAware() {
 
   // Handle navigation
   const handleNavigate = (view: string) => {
+    if (view !== "messages") setViewingConversationId(null);
     switch (view) {
       case "home":
         setCurrentView(
@@ -538,6 +551,9 @@ export default function AppRoleAware() {
         break;
       case "profile":
         setCurrentView("profile");
+        break;
+      case "pro-public-profile":
+        setCurrentView("pro-public-profile");
         break;
       case "quotes":
         setCurrentView("quotes");
@@ -794,23 +810,34 @@ export default function AppRoleAware() {
       {currentView === "messages" && (
         <div className="h-full overflow-hidden">
           <MessagesPageIntegrated
-            onViewStatus={handleViewStatus}
+            userId={currentUser.id}
+            userRole={currentUser.role}
+            dealerIdToOpen={dealerIdToOpen}
+            onViewingConversation={setViewingConversationId}
+            onMarkAsRead={markAsRead}
           />
         </div>
       )}
 
       {/* Bookings */}
       {currentView === "bookings" && (
-        <div className="h-full overflow-hidden">
-          <BookingsPageIntegrated
-            clientId={currentUser.role === "client" ? currentUser.id : undefined}
-            onNavigateToMessages={(params) => {
-              setCurrentView("messages");
-              toast.info("Opening conversation...");
-            }}
-            onViewStatus={handleViewStatus}
-            onRequestQuote={currentUser.role === "client" ? () => setCurrentView("marketplace") : undefined}
-          />
+        <div className="h-full overflow-y-auto">
+          {currentUser.role === "client" ? (
+            <BookingsPageIntegrated
+              clientId={currentUser.id}
+              onNavigateToMessages={({ dealerId }) => {
+                setDealerIdToOpen(dealerId);
+                setCurrentView("messages");
+                toast.info("Opening conversation...");
+              }}
+              onViewStatus={handleViewStatus}
+              onRequestQuote={() => setCurrentView("marketplace")}
+            />
+          ) : (
+            <div className="max-w-4xl mx-auto p-6">
+              <DealerOrdersQueue dealerId={currentUser.id} onNavigate={(v) => setCurrentView(v as View)} />
+            </div>
+          )}
         </div>
       )}
 
@@ -822,6 +849,7 @@ export default function AppRoleAware() {
               bookingId={selectedBookingId}
               onBack={handleBackFromStatus}
               onNavigateToMessages={() => {
+                setDealerIdToOpen(undefined);
                 setCurrentView("messages");
                 toast.info("Opening conversation...");
               }}
@@ -844,7 +872,9 @@ export default function AppRoleAware() {
         <div className="h-full overflow-hidden">
           <StatusCenter
             role={currentUser.role}
-            onNavigateToMessages={() => {
+            userId={currentUser.id}
+            onNavigateToMessages={(params) => {
+              setDealerIdToOpen(params?.dealerId ?? null);
               setCurrentView("messages");
               toast.info("Opening conversation...");
             }}
@@ -915,6 +945,7 @@ export default function AppRoleAware() {
             }
           }}
           onMessage={() => {
+            setDealerIdToOpen(selectedDetailerId);
             setCurrentView("messages");
             toast.info("Opening conversation...");
           }}
@@ -985,10 +1016,12 @@ export default function AppRoleAware() {
           userPhone={currentUser.phone}
           userRole={currentUser.role}
           clientId={currentUser.role === 'client' ? currentUser.id : undefined}
+          dealerLogoUrl={currentUser.role === 'detailer' ? dealerProfile?.logo_url : undefined}
           vehicles={currentUser.role === 'client' ? (currentUser as Customer).vehicles ?? [] : []}
           showProfileSidebar={shouldShowProfileSidebar}
           onSearch={handleSearch}
           onLogout={handleLogout}
+          unreadMessages={unreadCount}
         >
           {mainContent}
         </WebLayout>
