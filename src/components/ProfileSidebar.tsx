@@ -10,9 +10,10 @@ interface ProfileSidebarProps {
   userRole: 'client' | 'detailer';
   clientId?: string;
   vehicles?: Vehicle[];
+  onNavigate?: (view: string) => void;
 }
 
-export function ProfileSidebar({ userName, userEmail, userPhone, userRole, clientId, vehicles: vehiclesProp = [] }: ProfileSidebarProps) {
+export function ProfileSidebar({ userName, userEmail, userPhone, userRole, clientId, vehicles: vehiclesProp = [], onNavigate }: ProfileSidebarProps) {
   const { vehicles: vehiclesFromDb } = useClientProfile(userRole === 'client' ? clientId : undefined);
   const vehicles = vehiclesFromDb.length > 0 ? vehiclesFromDb : vehiclesProp;
   return (
@@ -20,10 +21,15 @@ export function ProfileSidebar({ userName, userEmail, userPhone, userRole, clien
       <div className="p-6">
         {/* Profile Header */}
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-4 text-white mb-6 relative">
-          <button className="absolute top-3 right-3 bg-white text-blue-600 px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
-            <Edit className="w-3 h-3" />
-            Edit
-          </button>
+          {userRole === 'client' && onNavigate && (
+            <button
+              onClick={() => onNavigate('settings')}
+              className="absolute top-3 right-3 bg-white text-blue-600 px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 hover:bg-blue-50 transition-colors"
+            >
+              <Edit className="w-3 h-3" />
+              Edit
+            </button>
+          )}
           
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">

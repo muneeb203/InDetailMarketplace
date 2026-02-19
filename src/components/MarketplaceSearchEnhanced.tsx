@@ -59,14 +59,28 @@ export function MarketplaceSearchEnhanced({
 
     let ranked = rankDetailers(detailers, params);
 
-    // Search filter
-    if (searchQuery) {
-      ranked = ranked.filter(
-        (d) =>
-          d.businessName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          d.bio.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          d.services.some((s) => s.toLowerCase().includes(searchQuery.toLowerCase()))
-      );
+    // Search filter - robust matching across business name, bio, services, specialties, location, name
+    const q = searchQuery?.trim().toLowerCase();
+    if (q) {
+      ranked = ranked.filter((d) => {
+        const businessName = (d.businessName ?? '').toLowerCase();
+        const bio = (d.bio ?? '').toLowerCase();
+        const loc = (d.location ?? '').toLowerCase();
+        const name = (d.name ?? '').toLowerCase();
+        const services = (d.services ?? []).map((s) => s.toLowerCase());
+        const specialties = (d.specialties ?? []).map((s) => s.toLowerCase());
+        const certifications = (d.certifications ?? []).map((c) => c.toLowerCase());
+
+        return (
+          businessName.includes(q) ||
+          bio.includes(q) ||
+          loc.includes(q) ||
+          name.includes(q) ||
+          services.some((s) => s.includes(q)) ||
+          specialties.some((s) => s.includes(q)) ||
+          certifications.some((c) => c.includes(q))
+        );
+      });
     }
 
     // Price filter

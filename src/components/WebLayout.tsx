@@ -1,5 +1,5 @@
 import React, { ReactNode, useState, useEffect } from 'react';
-import { Search, Bell, User, MessageSquare, Calendar, Activity, FileText, AlertCircle, Home, Settings, LogOut, Package } from 'lucide-react';
+import { Bell, MessageSquare, Calendar, Activity, FileText, AlertCircle, Home, Settings, LogOut, Package } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { ProfileSidebar } from './ProfileSidebar';
 import type { Vehicle } from '../types';
@@ -17,7 +17,6 @@ interface WebLayoutProps {
   dealerLogoUrl?: string | null;
   vehicles?: Vehicle[];
   showProfileSidebar?: boolean;
-  onSearch?: (query: string) => void;
   onLogout?: () => void;
   unreadMessages?: number;
 }
@@ -35,50 +34,15 @@ export function WebLayout({
   dealerLogoUrl,
   vehicles = [],
   showProfileSidebar = true,
-  onSearch,
   onLogout,
   unreadMessages = 0,
 }: WebLayoutProps) {
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [logoError, setLogoError] = useState(false);
 
   useEffect(() => {
     setLogoError(false);
   }, [dealerLogoUrl]);
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log('Search form submitted, query:', searchQuery);
-    console.log('onSearch function exists:', !!onSearch);
-    if (onSearch && searchQuery.trim()) {
-      console.log('Calling onSearch with:', searchQuery);
-      onSearch(searchQuery);
-      // Optionally clear search after submission
-      // setSearchQuery('');
-    } else if (searchQuery.trim()) {
-      // If no onSearch handler, show a message
-      console.log('No onSearch handler, query:', searchQuery);
-      alert(`Searching for: ${searchQuery}`);
-    } else {
-      console.log('Empty search query');
-    }
-  };
-
-  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-  };
-
-  const handleSearchButtonClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    console.log('Search button clicked, query:', searchQuery);
-    if (onSearch && searchQuery.trim()) {
-      console.log('Calling onSearch from button with:', searchQuery);
-      onSearch(searchQuery);
-    } else if (searchQuery.trim()) {
-      alert(`Searching for: ${searchQuery}`);
-    }
-  };
 
   // Use business name for detailers, personal name for clients
   const displayName = userRole === 'detailer' && businessName ? businessName : userName;
@@ -108,28 +72,6 @@ export function WebLayout({
               <p className="text-xs text-gray-500">{accountType}</p>
             </div>
           </div>
-
-          {/* Search Bar */}
-          <form onSubmit={handleSearch} className="flex-1 max-w-xl">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={handleSearchInputChange}
-                placeholder="Search detailers or services..."
-                className="w-full pl-10 pr-12 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-              />
-              <button 
-                type="submit"
-                onClick={handleSearchButtonClick}
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-blue-600 text-white p-1.5 rounded hover:bg-blue-700 transition-colors active:scale-95"
-                aria-label="Search"
-              >
-                <Search className="w-4 h-4" />
-              </button>
-            </div>
-          </form>
         </div>
 
         {/* Right Side Navigation */}
@@ -154,19 +96,12 @@ export function WebLayout({
           >
             Status
           </button>
-          {userRole === 'detailer' ? (
+          {userRole === 'detailer' && (
             <button
               onClick={() => onNavigate('pro-public-profile')}
               className={`text-sm font-medium transition-colors ${currentView === 'pro-public-profile' ? 'text-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
             >
               View Gig
-            </button>
-          ) : (
-            <button
-              onClick={() => onNavigate('profile')}
-              className={`text-sm font-medium transition-colors ${currentView === 'profile' ? 'text-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
-            >
-              Profile
             </button>
           )}
           <button className="relative hover:opacity-80 transition-opacity">
@@ -175,14 +110,6 @@ export function WebLayout({
               3
             </span>
           </button>
-          {userRole === 'client' && (
-            <button 
-              onClick={() => onNavigate('profile')}
-              className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300 transition-colors"
-            >
-              <User className="w-5 h-5 text-gray-600" />
-            </button>
-          )}
         </div>
       </header>
 
@@ -421,13 +348,14 @@ export function WebLayout({
 
         {/* Right Sidebar - Profile */}
         {showProfileSidebar && (
-          <ProfileSidebar 
+          <ProfileSidebar
             userName={userName}
             userEmail={userEmail}
             userPhone={userPhone}
             userRole={userRole}
             clientId={clientId}
             vehicles={vehicles}
+            onNavigate={onNavigate}
           />
         )}
       </div>

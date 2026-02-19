@@ -567,26 +567,6 @@ export default function AppRoleAware() {
     }
   };
 
-  // Handle search
-  const handleSearch = (query: string) => {
-    console.log("Searching for:", query);
-    
-    if (currentUser?.role === "client") {
-      toast.success(`Searching for: ${query}`);
-      setCurrentView("marketplace");
-      // In production, this would filter the detailers list
-    } else {
-      // For detailers, search in leads, bookings, messages
-      toast.success(`Searching for: ${query}`);
-      console.log("Detailer search:", query);
-      // Could search through:
-      // - Lead names/locations
-      // - Booking details
-      // - Message history
-      // For now, just show the search worked
-    }
-  };
-
   // Handle view job status
   const handleViewStatus = (bookingId: string) => {
     setSelectedBookingId(bookingId);
@@ -1019,7 +999,6 @@ export default function AppRoleAware() {
           dealerLogoUrl={currentUser.role === 'detailer' ? dealerProfile?.logo_url : undefined}
           vehicles={currentUser.role === 'client' ? (currentUser as Customer).vehicles ?? [] : []}
           showProfileSidebar={shouldShowProfileSidebar}
-          onSearch={handleSearch}
           onLogout={handleLogout}
           unreadMessages={unreadCount}
         >
