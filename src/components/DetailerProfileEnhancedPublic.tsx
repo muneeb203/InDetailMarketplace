@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Detailer } from '../types';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -18,8 +18,11 @@ import {
   Play,
   Eye,
   BadgeCheck,
-  Sparkles
+  Sparkles,
+  Bookmark
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { trackProfileView, toggleDealerSave, getPublicDealerStats, isDealerSavedByClient } from '../services/exposureService';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { BeforeAfterCarousel } from './BeforeAfterCarousel';
 import { SocialFeedModal } from './SocialFeedModal';
@@ -38,8 +41,36 @@ export function DetailerProfileEnhancedPublic({
   onRequestQuote,
   onMessage,
 }: DetailerProfileEnhancedPublicProps) {
+  const { currentUser } = useAuth();
   const [selectedSocial, setSelectedSocial] = useState<any>(null);
   const [videoPlaying, setVideoPlaying] = useState(false);
+  const [publicStats, setPublicStats] = useState<{ profile_views: number; saves: number } | null>(null);
+  const [isSaved, setIsSaved] = useState(false);
+  const profileViewTracked = useRef(false);
+
+  // Track profile view once per page load (do not block UI)
+  useEffect(() => {
+    if (profileViewTracked.current) return;
+    profileViewTracked.current = true;
+    const viewerId = currentUser?.id ?? null;
+    if (viewerId === detailer.id) return; // Don't track own profile
+    trackProfileView(detailer.id, viewerId);
+  }, [detailer.id, currentUser?.id]);
+
+  // Fetch public stats (profile views, saves) and saved state for clients
+  useEffect(() => {
+    getPublicDealerStats(detailer.id).then(setPublicStats);
+    if (currentUser?.role === 'client') {
+      isDealerSavedByClient(detailer.id, currentUser.id).then(setIsSaved);
+    }
+  }, [detailer.id, currentUser?.id, currentUser?.role]);
+
+  const handleSaveToggle = async () => {
+    if (currentUser?.role !== 'client') return;
+    const saved = await toggleDealerSave(detailer.id, currentUser.id);
+    setIsSaved(saved);
+    setPublicStats((s) => s ? { ...s, saves: s.saves + (saved ? 1 : -1) } : { profile_views: 0, saves: saved ? 1 : 0 });
+  };
 
   // Mock social connections if not provided
   const mockSocialConnections = detailer.socialConnections || [
@@ -192,7 +223,9 @@ export function DetailerProfileEnhancedPublic({
       {/* Content */}
       <div className="flex-1 overflow-auto pb-24">
         {/* Brand Header Card */}
+        {/* Gig Brief Details */}
         <Card className="m-4 p-6 bg-gradient-to-br from-white via-blue-50/30 to-purple-50/30 border-2 border-blue-100">
+          <p className="text-xs font-medium text-blue-600 uppercase tracking-wide mb-3">Gig Details</p>
           <div className="flex gap-4 mb-4">
             {/* Logo/Avatar */}
             <div className="relative flex-shrink-0">
@@ -429,30 +462,47 @@ export function DetailerProfileEnhancedPublic({
           )}
         </Card>
 
-        {/* Exposure indicator for trust */}
-        <div className="mx-4 mb-4 flex items-center justify-center gap-2 text-sm text-gray-600">
-          <Eye className="w-4 h-4" />
-          <span>
-            Seen by {(detailer.exposureMetrics?.profileViews || 1243).toLocaleString()} customers this month
-          </span>
+        {/* Save Dealer + Exposure indicator */}
+        <div className="mx-4 mb-4 flex flex-col sm:flex-row items-center justify-center gap-3">
+          {currentUser?.role === 'client' && (
+            <Button
+              variant={isSaved ? 'default' : 'outline'}
+              size="sm"
+              onClick={handleSaveToggle}
+              className="gap-2"
+            >
+              <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
+              {isSaved ? 'Saved' : 'Save Dealer'}
+              {(publicStats?.saves ?? 0) > 0 && (
+                <span className="text-xs opacity-80">({(publicStats?.saves ?? 0).toLocaleString()})</span>
+              )}
+            </Button>
+          )}
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <Eye className="w-4 h-4" />
+            <span>
+              Seen by {(publicStats?.profile_views ?? 0).toLocaleString()} customers
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Fixed Bottom CTAs */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-4">
+      {/* Fixed Bottom CTAs - Text Dealer & Request Quote */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-4 z-30">
         <div className="max-w-md mx-auto flex gap-3">
           <Button
             onClick={onMessage}
             variant="outline"
-            className="flex-1 border-2 border-blue-600 text-blue-600 hover:bg-blue-50"
+            className="flex-1 border-2 border-blue-600 text-blue-600 hover:bg-blue-50 gap-2"
           >
-            Message
+            <Mail className="w-4 h-4" />
+            Text Dealer
           </Button>
           <Button
             onClick={onRequestQuote}
-            className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg"
+            className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg gap-2"
           >
-            Request Quote
+            Request Service
           </Button>
         </div>
       </div>

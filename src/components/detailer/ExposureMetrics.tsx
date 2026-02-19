@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Eye, Bookmark, Mail, CheckCircle, TrendingUp, TrendingDown, Lightbulb } from 'lucide-react';
+import React from 'react';
+import { Eye, Bookmark, Mail, CheckCircle, TrendingUp, TrendingDown, Lightbulb, Loader2 } from 'lucide-react';
 import { cn } from '../ui/utils';
 
 interface MetricData {
@@ -13,6 +13,9 @@ interface ExposureMetricsProps {
   saves: MetricData;
   leadOpens: MetricData;
   quoteAcceptRate: MetricData;
+  period: '7' | '30';
+  onPeriodChange: (p: '7' | '30') => void;
+  loading?: boolean;
   onTipsClick?: () => void;
   className?: string;
 }
@@ -22,10 +25,12 @@ export function ExposureMetrics({
   saves,
   leadOpens,
   quoteAcceptRate,
+  period,
+  onPeriodChange,
+  loading = false,
   onTipsClick,
   className,
 }: ExposureMetricsProps) {
-  const [period, setPeriod] = useState<'7' | '30'>('30');
 
   const metrics = [
     {
@@ -66,7 +71,8 @@ export function ExposureMetrics({
           <h2 className="text-base font-semibold text-gray-900">Exposure metrics</h2>
           <div className="flex rounded-lg border border-gray-200 p-0.5 bg-gray-50">
             <button
-              onClick={() => setPeriod('7')}
+              onClick={() => onPeriodChange('7')}
+              disabled={loading}
               className={cn(
                 "px-3 py-1.5 rounded-md text-xs font-medium transition-all",
                 period === '7'
@@ -77,7 +83,8 @@ export function ExposureMetrics({
               7 days
             </button>
             <button
-              onClick={() => setPeriod('30')}
+              onClick={() => onPeriodChange('30')}
+              disabled={loading}
               className={cn(
                 "px-3 py-1.5 rounded-md text-xs font-medium transition-all",
                 period === '30'
@@ -90,6 +97,11 @@ export function ExposureMetrics({
           </div>
         </div>
 
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          </div>
+        ) : (
         <div className="grid grid-cols-2 gap-3 mb-4">
           {metrics.map((metric) => (
             <div
@@ -107,7 +119,7 @@ export function ExposureMetrics({
                 <div className="flex items-baseline gap-2">
                   <span className="text-lg font-bold text-gray-900 tabular-nums">
                     {metric.data.value.toLocaleString()}
-                    {metric.suffix}
+                    {metric.suffix ?? ''}
                   </span>
                   {metric.data.trend !== 'neutral' && (
                     <span
@@ -129,8 +141,9 @@ export function ExposureMetrics({
             </div>
           ))}
         </div>
+        )}
 
-        {onTipsClick && (
+        {onTipsClick && !loading && (
           <button
             onClick={onTipsClick}
             className="w-full h-10 rounded-xl border border-dashed border-gray-300 text-gray-600 text-sm font-medium hover:border-blue-300 hover:bg-blue-50/50 hover:text-blue-700 transition-all flex items-center justify-center gap-2"

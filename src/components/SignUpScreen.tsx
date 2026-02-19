@@ -384,15 +384,15 @@ export function SignUpScreen({
             >
               <Button
                 type="submit"
-                className={`w-full h-12 transition-all duration-300 ${
+                className={`w-full h-12 font-semibold transition-colors duration-200 ${
                   isSuccess
-                    ? 'bg-green-600 hover:bg-green-600'
-                    : 'bg-[#0078FF] hover:bg-[#0056CC] active:bg-[#0056CC]'
-                } text-white shadow-lg ${
-                  isValid && !isLoading
+                    ? '!bg-green-600 hover:!bg-green-600 disabled:!bg-green-600'
+                    : '!bg-[#0078FF] hover:!bg-[#0056CC] active:!bg-[#0047A3] disabled:!bg-gray-400 disabled:!text-gray-600'
+                } text-white shadow-md ${
+                  isValid && !isLoading && !isSuccess
                     ? 'shadow-blue-200/50'
                     : 'shadow-none'
-                } disabled:bg-[#0078FF] disabled:text-white disabled:opacity-70 disabled:cursor-not-allowed`}
+                } disabled:opacity-100 disabled:cursor-not-allowed`}
                 disabled={!isValid || isLoading || isSuccess}
               >
                 <AnimatePresence mode="wait">

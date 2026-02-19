@@ -386,8 +386,11 @@ function DetailerCard({
   onRequestQuote: (detailer: Detailer) => void;
 }) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const logoOrAvatar = detailer.logo ?? detailer.avatar;
   const portfolioPhotos = detailer.portfolioPhotos || detailer.photos || [];
-  const displayPhotos = portfolioPhotos.slice(0, 3);
+  const displayPhotos = portfolioPhotos.length > 0
+    ? portfolioPhotos.slice(0, 3)
+    : logoOrAvatar ? [logoOrAvatar] : [];
 
   const responseTime = detailer.isPro ? '< 10 min' : '< 30 min';
 

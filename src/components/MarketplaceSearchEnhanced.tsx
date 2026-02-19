@@ -206,14 +206,18 @@ export function MarketplaceSearchEnhanced({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
-              className="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden hover:shadow-xl hover:border-blue-200 transition-all duration-300 transform hover:-translate-y-1"
+              onClick={() => onSelectDetailer(detailer)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === 'Enter' && onSelectDetailer(detailer)}
+              className="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden hover:shadow-xl hover:border-blue-200 transition-all duration-300 transform hover:-translate-y-1 cursor-pointer"
             >
               <div className="relative group">
-                {/* Main Image - portfolio first, then logo, then avatar */}
+                {/* Main Image - logo (profile picture) first, then portfolio, then avatar */}
                 <div className="relative h-56 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
-                  {(detailer.photos?.[0] ?? detailer.logo ?? detailer.avatar) ? (
+                  {(detailer.logo ?? detailer.photos?.[0] ?? detailer.avatar) ? (
                     <ImageWithFallback
-                      src={detailer.photos?.[0] ?? detailer.logo ?? detailer.avatar}
+                      src={detailer.logo ?? detailer.photos?.[0] ?? detailer.avatar}
                       alt={detailer.businessName}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
@@ -288,7 +292,9 @@ export function MarketplaceSearchEnhanced({
                 {/* Location */}
                 <div className="flex items-start gap-2 mb-3">
                   <MapPin className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                  <p className="text-sm text-gray-600 line-clamp-1">{detailer.serviceArea || detailer.location}</p>
+                  <p className="text-sm text-gray-600 line-clamp-1">
+                    {[detailer.location !== 'Unknown' && detailer.location, detailer.serviceRadius && `${detailer.serviceRadius} mi radius`].filter(Boolean).join(' · ') || '—'}
+                  </p>
                 </div>
 
                 {/* Bio */}
@@ -311,27 +317,36 @@ export function MarketplaceSearchEnhanced({
                   )}
                 </div>
 
-                {/* Action Buttons */}
-                <div className="space-y-2">
+                {/* Action Buttons - stopPropagation so card click doesn't fire */}
+                <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
                   <div className="flex gap-2">
                     <Button
-                      onClick={() => onRequestQuote(detailer)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRequestQuote(detailer);
+                      }}
                       className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg transition-all h-11 font-semibold"
                     >
-                      Request Quote
+                      Request Service
                     </Button>
                     <Button
-                      onClick={() => onSelectDetailer(detailer)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectDetailer(detailer);
+                      }}
                       variant="outline"
                       className="flex-1 border-2 border-gray-300 hover:bg-gray-50 hover:border-gray-400 h-11 font-semibold transition-all"
                     >
-                      View Profile
+                      View Details
                     </Button>
                   </div>
                   
                   {(detailer.commPreference === 'voice' || detailer.commPreference === 'voice-chat') && (
                     <Button
-                      onClick={() => handleRequestCallback(detailer)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRequestCallback(detailer);
+                      }}
                       variant="outline"
                       className="w-full border-2 border-green-500 text-green-600 hover:bg-green-50 hover:border-green-600 h-10 font-medium transition-all"
                     >

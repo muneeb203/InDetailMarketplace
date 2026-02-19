@@ -18,11 +18,15 @@ import { StatusCenter } from "./components/StatusCenter";
 import { BookingRequestForm } from "./components/BookingRequestForm";
 import { DetailerProfile } from "./components/DetailerProfile";
 import { DetailerProfileEnhancedPublic } from "./components/DetailerProfileEnhancedPublic";
+import { OrderPlacementModal } from "./components/OrderPlacementModal";
+import { ClientOrdersPage } from "./components/ClientOrdersPage";
 import { ProDashboard } from "./components/detailer/ProDashboard";
 import { ProProfileEditor } from "./components/detailer/ProProfileEditor";
 import { ProPublicProfile } from "./components/detailer/ProPublicProfile";
 import { ProLeadInbox } from "./components/detailer/ProLeadInbox";
+import { DealerOrdersQueue } from "./components/detailer/DealerOrdersQueue";
 import { DealerSettings } from "./components/detailer/DealerSettings/DealerSettings";
+import { ClientSettings } from "./components/ClientSettings";
 import { DetailerProfileHome } from "./components/detailer/DetailerProfileHome";
 import { WebLayout } from "./components/WebLayout";
 import { Toaster } from "./components/ui/sonner";
@@ -33,7 +37,8 @@ import { useDetailers } from "./hooks/useDetailers";
 import { signUpAuthOnly, createClientProfile, createDealerProfile, signInAndLoadProfile } from "./services/supabaseAuth";
 import { supabase } from "./lib/supabaseClient";
 import { getLeadCost } from "./services/stripeService";
-import { FileText, AlertCircle } from "lucide-react";
+import { FileText, AlertCircle, ArrowLeft } from "lucide-react";
+import { Button } from "./components/ui/button";
 import { DebugDataSource } from "./components/DebugDataSource";
 import { useAuth } from "./context/AuthContext";
 
@@ -47,6 +52,7 @@ type View =
   | "dashboard"
   | "messages"
   | "bookings"
+  | "my-orders"
   | "profile"
   | "status-demo"
   | "job-status"
@@ -57,6 +63,7 @@ type View =
   | "pro-profile-editor"
   | "pro-public-profile"
   | "pro-lead-inbox"
+  | "orders-queue"
   | "quotes"
   | "alerts"
   | "settings";
@@ -82,6 +89,7 @@ export default function AppRoleAware() {
     string | null
   >(null);
   const [proNavParams, setProNavParams] = useState<any>({});
+  const [orderModalOpen, setOrderModalOpen] = useState(false);
   
   // Fetch real detailers from Supabase
   const { detailers, loading: detailersLoading, error: detailersError } = useDetailers();
@@ -341,6 +349,8 @@ export default function AppRoleAware() {
     locationLng: number;
     specialties: string[];
     priceRange: string;
+    portfolioImages?: string[];
+    logoUrl?: string;
   }) => {
     if (!tempUserData) return;
 
@@ -357,6 +367,8 @@ export default function AppRoleAware() {
         serviceRadius: data.serviceRadius,
         priceRange: data.priceRange,
         specialties: data.specialties,
+        portfolioImages: data.portfolioImages,
+        logoUrl: data.logoUrl,
       });
 
       const user: Detailer & { role: "detailer" } = {
@@ -373,7 +385,7 @@ export default function AppRoleAware() {
         serviceRadius: data.serviceRadius,
         priceRange: data.priceRange,
         rating: 0,
-        photos: [],
+        photos: data.portfolioImages ?? [],
         services: data.specialties,
         specialties: data.specialties,
         isPro: false,
@@ -400,6 +412,11 @@ export default function AppRoleAware() {
 
   // Handle Pro navigation
   const handleProNavigate = (view: string, params?: any) => {
+    if (view === 'settings') {
+      setCurrentView('settings');
+      setProNavParams(params || {});
+      return;
+    }
     const viewMap: Record<string, View> = {
       'pro-dashboard': 'pro-dashboard',
       'dashboard': 'pro-dashboard',
@@ -409,6 +426,7 @@ export default function AppRoleAware() {
       'public-profile': 'pro-public-profile',
       'pro-lead-inbox': 'pro-lead-inbox',
       'lead-inbox': 'pro-lead-inbox',
+      'orders-queue': 'orders-queue',
     };
 
     const mappedView = viewMap[view] || 'pro-dashboard';
@@ -512,6 +530,9 @@ export default function AppRoleAware() {
         break;
       case "bookings":
         setCurrentView("bookings");
+        break;
+      case "my-orders":
+        setCurrentView("my-orders");
         break;
       case "status":
         setCurrentView("status");
@@ -650,6 +671,7 @@ export default function AppRoleAware() {
         <Toaster position="top-center" richColors />
         <DetailerOnboarding
           userName={tempUserData.name}
+          userId={tempUserData.userId}
           onComplete={handleDetailerOnboardingComplete}
         />
       </>
@@ -670,7 +692,8 @@ export default function AppRoleAware() {
     "request-quote",
     "pro-profile-editor",
     "pro-public-profile",
-    "pro-lead-inbox"
+    "pro-lead-inbox",
+    "orders-queue"
   ];
 
   const shouldUseWebLayout = !fullScreenViews.includes(currentView);
@@ -693,7 +716,11 @@ export default function AppRoleAware() {
               }}
               onRequestQuote={(detailer) => {
                 setSelectedDetailerId(detailer.id);
-                setCurrentView("request-quote");
+                if (currentUser.role === "client") {
+                  setOrderModalOpen(true);
+                } else {
+                  setCurrentView("request-quote");
+                }
               }}
             />
             <DebugDataSource 
@@ -786,11 +813,13 @@ export default function AppRoleAware() {
       {currentView === "bookings" && (
         <div className="h-full overflow-hidden">
           <BookingsPageIntegrated
-            onNavigateToMessages={(bookingId) => {
+            clientId={currentUser.role === "client" ? currentUser.id : undefined}
+            onNavigateToMessages={(params) => {
               setCurrentView("messages");
               toast.info("Opening conversation...");
             }}
             onViewStatus={handleViewStatus}
+            onRequestQuote={currentUser.role === "client" ? () => setCurrentView("marketplace") : undefined}
           />
         </div>
       )}
@@ -872,21 +901,12 @@ export default function AppRoleAware() {
       {currentView === "settings" && (
         <div className="h-full overflow-auto">
           {currentUser.role === "detailer" ? (
-            <DealerSettings onNavigate={(v) => setCurrentView(v as View)} />
+            <DealerSettings
+              onNavigate={(v) => setCurrentView(v as View)}
+              initialTab={proNavParams?.tab}
+            />
           ) : (
-            <div className="p-6 max-w-4xl mx-auto">
-              <h1 className="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
-              <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
-                <section>
-                  <h2 className="text-base font-semibold text-gray-900 mb-2">Account</h2>
-                  <p className="text-sm text-gray-500">Manage your account and preferences here.</p>
-                </section>
-                <section>
-                  <h2 className="text-base font-semibold text-gray-900 mb-2">Notifications</h2>
-                  <p className="text-sm text-gray-500">Configure how you receive alerts and updates.</p>
-                </section>
-              </div>
-            </div>
+            <ClientSettings />
           )}
         </div>
       )}
@@ -897,8 +917,12 @@ export default function AppRoleAware() {
           detailer={displayDetailers.find(d => d.id === selectedDetailerId) || displayDetailers[0]}
           onBack={() => setCurrentView("marketplace")}
           onRequestQuote={() => {
-            setCurrentView("request-quote");
-            toast.info("Request a quote from this detailer");
+            if (currentUser.role === "client") {
+              setOrderModalOpen(true);
+            } else {
+              setCurrentView("request-quote");
+              toast.info("Request a quote from this detailer");
+            }
           }}
           onMessage={() => {
             setCurrentView("messages");
@@ -907,7 +931,22 @@ export default function AppRoleAware() {
         />
       )}
 
-      {/* Request Quote Form */}
+      {/* Order Placement Modal (Client) */}
+      {currentUser.role === "client" && selectedDetailerId && (
+        <OrderPlacementModal
+          open={orderModalOpen}
+          onOpenChange={setOrderModalOpen}
+          detailer={displayDetailers.find(d => d.id === selectedDetailerId) || displayDetailers[0]}
+          clientId={currentUser.id}
+          onSuccess={() => {
+            toast.success("Order placed successfully!");
+            setCurrentView("my-orders");
+          }}
+          onError={(msg) => toast.error(msg)}
+        />
+      )}
+
+      {/* Request Quote Form (legacy / non-order flow) */}
       {currentView === "request-quote" && selectedDetailerId && currentUser.role === "client" && (
         <BookingRequestForm
           detailer={displayDetailers.find(d => d.id === selectedDetailerId) || displayDetailers[0]}
@@ -918,6 +957,26 @@ export default function AppRoleAware() {
             setCurrentView("bookings");
           }}
         />
+      )}
+
+      {/* My Orders (Client) */}
+      {currentView === "my-orders" && currentUser.role === "client" && (
+        <ClientOrdersPage clientId={currentUser.id} />
+      )}
+
+      {/* Orders Queue (Dealer) */}
+      {currentView === "orders-queue" && currentUser.role === "detailer" && (
+        <div className="h-full overflow-auto">
+          <div className="sticky top-0 z-10 bg-white border-b px-4 py-3 flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={() => setCurrentView("pro-dashboard")}>
+              <ArrowLeft className="w-5 h-5 mr-1" />
+              Back
+            </Button>
+          </div>
+          <div className="p-6">
+            <DealerOrdersQueue dealerId={currentUser.id} onNavigate={(v) => setCurrentView(v as View)} />
+          </div>
+        </div>
       )}
     </>
   );
@@ -935,6 +994,8 @@ export default function AppRoleAware() {
           userEmail={currentUser.email}
           userPhone={currentUser.phone}
           userRole={currentUser.role}
+          clientId={currentUser.role === 'client' ? currentUser.id : undefined}
+          vehicles={currentUser.role === 'client' ? (currentUser as Customer).vehicles ?? [] : []}
           showProfileSidebar={shouldShowProfileSidebar}
           onSearch={handleSearch}
           onLogout={handleLogout}

@@ -211,3 +211,31 @@ export interface Review {
   comment: string;
   createdAt: Date;
 }
+
+/** Order status progression: pending → countered | accepted | rejected → paid → in_progress → completed */
+export type OrderStatus =
+  | 'pending'
+  | 'countered'
+  | 'accepted'
+  | 'rejected'
+  | 'paid'
+  | 'in_progress'
+  | 'completed';
+
+export interface Order {
+  id: string;
+  gig_id: string;
+  client_id: string;
+  dealer_id: string;
+  proposed_price: number;
+  agreed_price: number | null;
+  notes: string | null;
+  scheduled_date: string | null;
+  status: OrderStatus;
+  created_at: string;
+  updated_at: string;
+  opened_at: string | null;
+  // Joined data (from queries)
+  dealer?: { id: string; business_name?: string; base_location?: string };
+  client?: { id: string; name?: string };
+}

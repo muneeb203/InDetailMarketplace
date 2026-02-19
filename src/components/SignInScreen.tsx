@@ -244,7 +244,7 @@ export function SignInScreen({
             <motion.div whileTap={isValid && !isLoading ? { scale: 0.98 } : {}}>
               <Button
                 type="submit"
-                className="w-full h-12 bg-[#0078FF] hover:bg-[#0056CC] text-white transition-all duration-300 shadow-lg shadow-blue-200/50 disabled:bg-gray-300 disabled:text-gray-500 disabled:shadow-none disabled:cursor-not-allowed"
+                className="w-full h-12 !bg-[#0078FF] hover:!bg-[#0056CC] active:!bg-[#0047A3] text-white font-semibold transition-colors duration-200 shadow-md disabled:!bg-gray-400 disabled:!text-gray-600 disabled:opacity-100 disabled:shadow-none disabled:cursor-not-allowed"
                 disabled={!isValid || isLoading}
               >
                 <AnimatePresence mode="wait">

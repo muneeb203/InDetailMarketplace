@@ -1,16 +1,21 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card } from './ui/card';
 import { Progress } from './ui/progress';
 import { Slider } from './ui/slider';
 import { Badge } from './ui/badge';
-import { Briefcase, MapPin, Award, DollarSign, Camera, Check, Loader2, AlertCircle } from 'lucide-react';
+import { Briefcase, MapPin, Award, DollarSign, Camera, Check, Loader2, AlertCircle, Minus, Plus, Trash2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { getCurrentLocation } from '../services/geolocationService';
+import { ServiceRadiusMap } from './ServiceRadiusMap';
+import { uploadLogoToStorage, uploadPortfolioImageToStorage } from '../services/dealerImageService';
+import { ImageWithFallback } from './figma/ImageWithFallback';
+import { toast } from 'sonner';
 
 interface DetailerOnboardingProps {
   userName: string;
+  userId: string;
   onComplete: (data: {
     businessName: string;
     serviceRadius: number;
@@ -19,7 +24,8 @@ interface DetailerOnboardingProps {
     locationLng: number;
     specialties: string[];
     priceRange: string;
-    portfolioPhoto?: string;
+    portfolioImages?: string[];
+    logoUrl?: string;
   }) => void;
 }
 
@@ -41,8 +47,11 @@ const PRICE_RANGES = [
   { value: '$$$$', label: '$$$$', description: 'Luxury' },
 ];
 
+const MAX_PORTFOLIO_ONBOARDING = 5;
+
 export function DetailerOnboarding({
   userName,
+  userId,
   onComplete,
 }: DetailerOnboardingProps) {
   const [step, setStep] = useState(1);
@@ -58,7 +67,16 @@ export function DetailerOnboarding({
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [locationSuccess, setLocationSuccess] = useState(false);
-  const [serviceRadius, setServiceRadius] = useState([10]);
+  const [serviceRadius, setServiceRadius] = useState(10);
+  const [radiusInput, setRadiusInput] = useState('10');
+
+  const MIN_RADIUS = 5;
+  const MAX_RADIUS = 100;
+  const RADIUS_STEP = 5;
+
+  useEffect(() => {
+    setRadiusInput(String(serviceRadius));
+  }, [serviceRadius]);
 
   // Step 3: Specialties
   const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
@@ -66,8 +84,13 @@ export function DetailerOnboarding({
   // Step 4: Price Range
   const [priceRange, setPriceRange] = useState('');
 
-  // Step 5: Portfolio (optional)
+  // Step 5: Portfolio (optional) - first image = logo (logos folder), rest = portfolio
   const [skipPortfolio, setSkipPortfolio] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [portfolioImages, setPortfolioImages] = useState<string[]>([]);
+  const [portfolioUploading, setPortfolioUploading] = useState(false);
+  const [portfolioError, setPortfolioError] = useState<string | null>(null);
+  const portfolioInputRef = useRef<HTMLInputElement>(null);
 
   const progress = (step / totalSteps) * 100;
 
@@ -79,19 +102,108 @@ export function DetailerOnboarding({
     }
   };
 
+  const handleRadiusInputChange = (value: string) => {
+    setRadiusInput(value);
+  };
+
+  const handleRadiusBlur = () => {
+    const num = parseInt(radiusInput, 10);
+    if (isNaN(num) || num < MIN_RADIUS) {
+      setServiceRadius(MIN_RADIUS);
+      setRadiusInput(String(MIN_RADIUS));
+    } else if (num > MAX_RADIUS) {
+      setServiceRadius(MAX_RADIUS);
+      setRadiusInput(String(MAX_RADIUS));
+    } else {
+      const stepped = Math.round(num / RADIUS_STEP) * RADIUS_STEP;
+      const clamped = Math.min(MAX_RADIUS, Math.max(MIN_RADIUS, stepped));
+      setServiceRadius(clamped);
+      setRadiusInput(String(clamped));
+    }
+  };
+
+  const handleRadiusKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      (e.target as HTMLInputElement).blur();
+    }
+  };
+
   const handleComplete = () => {
     if (locationLat === null || locationLng === null) return;
     onComplete({
       businessName,
-      serviceRadius: serviceRadius[0],
+      serviceRadius,
       location,
       locationLat,
       locationLng,
       specialties: selectedSpecialties,
       priceRange,
-      portfolioPhoto: undefined,
+      portfolioImages: portfolioImages.length > 0 ? portfolioImages : undefined,
+      logoUrl: logoUrl ?? undefined,
     });
   };
+
+  const handlePortfolioFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    setPortfolioError(null);
+    try {
+      validateFile(file);
+      const totalCount = (logoUrl ? 1 : 0) + portfolioImages.length;
+      if (totalCount >= MAX_PORTFOLIO_ONBOARDING) {
+        throw new Error('Maximum 5 images allowed');
+      }
+      setPortfolioUploading(true);
+      if (!logoUrl) {
+        const url = await uploadLogoToStorage(userId, file);
+        setLogoUrl(url);
+        toast.success('Profile picture added (saved to logos)');
+      } else {
+        const url = await uploadPortfolioImageToStorage(userId, file);
+        setPortfolioImages((prev) => [...prev, url]);
+        toast.success('Photo added to portfolio');
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to upload';
+      setPortfolioError(msg);
+      toast.error(msg);
+    } finally {
+      setPortfolioUploading(false);
+    }
+  };
+
+  const handleRemovePortfolioImage = (url: string) => {
+    if (url === logoUrl) {
+      setLogoUrl(null);
+    } else {
+      setPortfolioImages((prev) => prev.filter((u) => u !== url));
+    }
+  };
+
+  const handlePortfolioDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setPortfolioError('Only image files allowed (PNG, JPG)');
+      return;
+    }
+    handlePortfolioFileSelect({ target: { files: [file] } } as any);
+  };
+
+  const handlePortfolioDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  function validateFile(file: File): void {
+    const MAX_SIZE = 5 * 1024 * 1024;
+    const ALLOWED = ['image/png', 'image/jpeg', 'image/jpg'];
+    if (file.size > MAX_SIZE) throw new Error('File must be under 5MB');
+    if (!ALLOWED.includes(file.type)) throw new Error('Only PNG and JPG allowed');
+  }
 
   const handleUseCurrentLocation = async () => {
     setLocationLoading(true);
@@ -254,31 +366,73 @@ export function DetailerOnboarding({
                 )}
 
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm">Service Radius</label>
-                    <span className="text-sm text-blue-600">
-                      {serviceRadius[0]} miles
-                    </span>
+                  <label className="text-sm block">Service Radius</label>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 shrink-0"
+                      onClick={() => setServiceRadius((r) => Math.max(MIN_RADIUS, r - RADIUS_STEP))}
+                      disabled={serviceRadius <= MIN_RADIUS}
+                    >
+                      <Minus className="w-4 h-4" />
+                    </Button>
+                    <Slider
+                      value={[serviceRadius]}
+                      onValueChange={([v]) => setServiceRadius(v)}
+                      min={MIN_RADIUS}
+                      max={MAX_RADIUS}
+                      step={RADIUS_STEP}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 shrink-0"
+                      onClick={() => setServiceRadius((r) => Math.min(MAX_RADIUS, r + RADIUS_STEP))}
+                      disabled={serviceRadius >= MAX_RADIUS}
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
                   </div>
-                  <Slider
-                    value={serviceRadius}
-                    onValueChange={setServiceRadius}
-                    min={5}
-                    max={50}
-                    step={5}
-                    className="w-full"
-                  />
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={MIN_RADIUS}
+                      max={MAX_RADIUS}
+                      step={RADIUS_STEP}
+                      value={radiusInput}
+                      onChange={(e) => handleRadiusInputChange(e.target.value)}
+                      onBlur={handleRadiusBlur}
+                      onKeyDown={handleRadiusKeyDown}
+                      className="w-20 h-9 text-center"
+                    />
+                    <span className="text-sm text-gray-600">miles</span>
+                  </div>
                   <p className="text-xs text-gray-500 text-center">
-                    You'll serve customers within this radius
+                    Min {MIN_RADIUS} miles. You&apos;ll serve customers within this radius.
                   </p>
                 </div>
 
-                {/* Map Placeholder */}
-                <div className="h-40 bg-gray-100 rounded-xl flex items-center justify-center border-2 border-dashed border-gray-300">
-                  <div className="text-center text-gray-500">
-                    <MapPin className="w-8 h-8 mx-auto mb-2" />
-                    <p className="text-xs">Service area preview</p>
-                  </div>
+                {/* Map Preview with Service Area Circle */}
+                <div className="h-48 rounded-xl overflow-hidden border-2 border-gray-200 bg-gray-100">
+                  {locationLat != null && locationLng != null ? (
+                    <ServiceRadiusMap
+                      lat={locationLat}
+                      lng={locationLng}
+                      radiusMiles={serviceRadius}
+                      className="w-full"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <div className="text-center text-gray-500">
+                        <MapPin className="w-8 h-8 mx-auto mb-2" />
+                        <p className="text-xs">Use &quot;Use Current Location&quot; to see your service area on the map</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </Card>
@@ -298,20 +452,23 @@ export function DetailerOnboarding({
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {SPECIALTIES.map((specialty) => (
-                    <Badge
-                      key={specialty}
-                      variant={
-                        selectedSpecialties.includes(specialty)
-                          ? 'default'
-                          : 'outline'
-                      }
-                      className="cursor-pointer px-3 py-2"
-                      onClick={() => toggleSpecialty(specialty)}
-                    >
-                      {specialty}
-                    </Badge>
-                  ))}
+                  {SPECIALTIES.map((specialty) => {
+                    const isSelected = selectedSpecialties.includes(specialty);
+                    return (
+                      <Badge
+                        key={specialty}
+                        variant={isSelected ? 'default' : 'outline'}
+                        className={`cursor-pointer px-3 py-2 transition-all ${
+                          isSelected
+                            ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                            : 'hover:bg-gray-100'
+                        }`}
+                        onClick={() => toggleSpecialty(specialty)}
+                      >
+                        {specialty}
+                      </Badge>
+                    );
+                  })}
                 </div>
                 <p className="text-xs text-gray-500 text-center">
                   {selectedSpecialties.length} selected
@@ -368,19 +525,83 @@ export function DetailerOnboarding({
                   <Camera className="w-6 h-6 text-amber-600" />
                 </div>
                 <div className="text-center space-y-2">
-                  <h3>Add your first portfolio photo</h3>
+                  <h3>Add your profile picture & portfolio</h3>
                   <p className="text-sm text-gray-600">
-                    Showcase your best work (optional)
+                    First image = gig logo (logos folder). Rest = portfolio (optional)
                   </p>
                 </div>
 
                 {!skipPortfolio ? (
-                  <div className="h-48 bg-gray-100 rounded-xl flex items-center justify-center border-2 border-dashed border-gray-300 cursor-pointer hover:border-blue-500 transition-colors">
-                    <div className="text-center text-gray-500">
-                      <Camera className="w-8 h-8 mx-auto mb-2" />
-                      <p className="text-sm">Click to upload</p>
-                      <p className="text-xs">or drag and drop</p>
+                  <div className="space-y-3">
+                    <div
+                      onClick={() => !portfolioUploading && portfolioInputRef.current?.click()}
+                      onDrop={handlePortfolioDrop}
+                      onDragOver={handlePortfolioDragOver}
+                      className={`h-40 rounded-xl flex flex-col items-center justify-center border-2 border-dashed border-gray-300 cursor-pointer transition-colors ${
+                        portfolioUploading ? 'opacity-60 pointer-events-none' : 'hover:border-blue-500 hover:bg-blue-50/50'
+                      }`}
+                    >
+                      <input
+                        ref={portfolioInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg"
+                        onChange={handlePortfolioFileSelect}
+                        className="hidden"
+                      />
+                      {portfolioUploading ? (
+                        <Loader2 className="w-8 h-8 text-blue-600 animate-spin mb-2" />
+                      ) : (
+                        <Camera className="w-8 h-8 text-gray-400 mb-2" />
+                      )}
+                      <p className="text-sm text-gray-600">Click to upload</p>
+                      <p className="text-xs text-gray-500">or drag and drop (PNG/JPG, max 5MB)</p>
                     </div>
+
+                    {(logoUrl || portfolioImages.length > 0) && (
+                      <div className="grid grid-cols-3 gap-2">
+                        {logoUrl && (
+                          <div key="logo" className="relative aspect-square rounded-lg overflow-hidden border-2 border-blue-300 group">
+                            <ImageWithFallback
+                              src={logoUrl}
+                              alt="Profile picture (logo)"
+                              className="w-full h-full object-cover"
+                            />
+                            <span className="absolute top-1 left-1 px-1.5 py-0.5 bg-blue-600 text-white text-xs rounded">Logo</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePortfolioImage(logoUrl)}
+                              className="absolute top-1 right-1 p-1 rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                              aria-label="Remove"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+                        {portfolioImages.map((url) => (
+                          <div key={url} className="relative aspect-square rounded-lg overflow-hidden border-2 border-gray-200 group">
+                            <ImageWithFallback
+                              src={url}
+                              alt="Portfolio"
+                              className="w-full h-full object-cover"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePortfolioImage(url)}
+                              className="absolute top-1 right-1 p-1 rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                              aria-label="Remove"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {portfolioError && (
+                      <p className="text-sm text-red-600 text-center">{portfolioError}</p>
+                    )}
+                    <p className="text-xs text-gray-500 text-center">
+                      {(logoUrl ? 1 : 0) + portfolioImages.length}/5 • First = gig logo (logos folder)
+                    </p>
                   </div>
                 ) : (
                   <div className="text-center py-8 text-gray-500 text-sm">

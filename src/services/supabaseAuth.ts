@@ -70,6 +70,8 @@ export async function createDealerProfile(params: {
   serviceRadius?: number;
   priceRange: string;
   specialties: string[];
+  portfolioImages?: string[];
+  logoUrl?: string;
 }) {
   const {
     userId,
@@ -83,6 +85,8 @@ export async function createDealerProfile(params: {
     serviceRadius = 15,
     priceRange,
     specialties,
+    portfolioImages = [],
+    logoUrl,
   } = params;
 
   const { error: profileError } = await supabase.from('profiles').upsert(
@@ -111,8 +115,8 @@ export async function createDealerProfile(params: {
       location_lng: locationLng,
       services_offered,
       price_range: priceRange,
-      logo_url: null,
-      portfolio_images: [],
+      logo_url: logoUrl ?? null,
+      portfolio_images: portfolioImages,
     },
     { onConflict: 'id' }
   );

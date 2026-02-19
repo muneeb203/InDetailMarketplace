@@ -1,6 +1,7 @@
 import React, { ReactNode, useState } from 'react';
-import { Search, Bell, User, MessageSquare, Calendar, Activity, FileText, AlertCircle, Home, Settings, LogOut } from 'lucide-react';
+import { Search, Bell, User, MessageSquare, Calendar, Activity, FileText, AlertCircle, Home, Settings, LogOut, Package } from 'lucide-react';
 import { ProfileSidebar } from './ProfileSidebar';
+import type { Vehicle } from '../types';
 
 interface WebLayoutProps {
   children: ReactNode;
@@ -11,6 +12,8 @@ interface WebLayoutProps {
   userEmail?: string;
   userPhone?: string;
   userRole?: 'client' | 'detailer';
+  clientId?: string;
+  vehicles?: Vehicle[];
   showProfileSidebar?: boolean;
   onSearch?: (query: string) => void;
   onLogout?: () => void;
@@ -25,6 +28,8 @@ export function WebLayout({
   userEmail,
   userPhone,
   userRole = "client",
+  clientId,
+  vehicles = [],
   showProfileSidebar = true,
   onSearch,
   onLogout,
@@ -110,6 +115,14 @@ export function WebLayout({
 
         {/* Right Side Navigation */}
         <div className="flex items-center gap-6">
+          {userRole === 'client' && (
+            <button
+              onClick={() => onNavigate('my-orders')}
+              className={`text-sm font-medium transition-colors ${currentView === 'my-orders' ? 'text-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
+            >
+              My Orders
+            </button>
+          )}
           <button
             onClick={() => onNavigate('bookings')}
             className={`text-sm font-medium transition-colors ${currentView === 'bookings' ? 'text-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
@@ -205,6 +218,27 @@ export function WebLayout({
               )}
             </button>
 
+            {userRole === 'client' && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onNavigate('my-orders');
+                }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors cursor-pointer ${
+                  currentView === 'my-orders'
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
+                title="My Orders"
+              >
+                <Package className="w-5 h-5 flex-shrink-0" />
+                {isSidebarExpanded && (
+                  <span className="font-medium whitespace-nowrap">My Orders</span>
+                )}
+              </button>
+            )}
             <button
               type="button"
               onClick={(e) => {
@@ -355,6 +389,8 @@ export function WebLayout({
             userEmail={userEmail}
             userPhone={userPhone}
             userRole={userRole}
+            clientId={clientId}
+            vehicles={vehicles}
           />
         )}
       </div>

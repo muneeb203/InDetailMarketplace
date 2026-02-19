@@ -13,10 +13,13 @@ export interface DealerProfileData {
   comm_preference?: string;
   location_lat?: number | null;
   location_lng?: number | null;
+  service_radius_miles?: number | null;
   services_offered?: { specialties?: string[]; serviceRadius?: number };
   operating_hours?: Record<string, { isOpen: boolean; open: string; close: string }>;
   is_insured?: boolean;
   is_pro?: boolean;
+  social_handles?: Record<string, string>;
+  promo?: { title?: string; description?: string; startDate?: string; endDate?: string; active?: boolean };
   [key: string]: unknown;
 }
 
@@ -54,10 +57,13 @@ export function useDealerProfile(userId: string | undefined) {
         comm_preference: profile?.comm_preference ?? 'voice-chat',
         location_lat: profile?.location_lat ?? null,
         location_lng: profile?.location_lng ?? null,
+        service_radius_miles: profile?.service_radius_miles ?? 10,
         services_offered: servicesOffered,
         operating_hours: profile?.operating_hours ?? undefined,
         is_insured: profile?.is_insured ?? false,
         is_pro: profile?.is_pro ?? false,
+        social_handles: (profile?.social_handles as Record<string, string>) ?? undefined,
+        promo: (profile?.promo as Record<string, unknown>) ?? undefined,
       });
     } catch (err) {
       setError(err as Error);

@@ -27,11 +27,11 @@ export function DetailerProfile({ detailer, onBack, onRequestQuote, onMessage }:
 
       {/* Content */}
       <div className="flex-1 overflow-auto pb-24">
-        {/* Photo Gallery */}
-        {detailer.photos.length > 0 && (
+        {/* Photo Gallery - logo (profile picture) first, then portfolio */}
+        {(detailer.logo ?? detailer.photos?.[0] ?? detailer.avatar) && (
           <div className="relative">
             <ImageWithFallback
-              src={detailer.photos[0]}
+              src={detailer.logo ?? detailer.photos?.[0] ?? detailer.avatar}
               alt={detailer.businessName}
               className="w-full h-64 object-cover"
             />

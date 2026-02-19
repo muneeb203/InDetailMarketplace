@@ -137,11 +137,11 @@ function GigCard({ detailer, onClick }: GigCardProps) {
       onClick={onClick}
       className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
     >
-      {/* Image - portfolio first, then logo, then avatar */}
+      {/* Image - logo (profile picture) first, then portfolio, then avatar */}
       <div className="relative h-48 bg-gray-200">
-        {(detailer.photos?.[0] ?? detailer.logo ?? detailer.avatar) ? (
+        {(detailer.logo ?? detailer.photos?.[0] ?? detailer.avatar) ? (
           <ImageWithFallback
-            src={detailer.photos?.[0] ?? detailer.logo ?? detailer.avatar}
+            src={detailer.logo ?? detailer.photos?.[0] ?? detailer.avatar}
             alt={detailer.businessName}
             className="w-full h-full object-cover"
           />

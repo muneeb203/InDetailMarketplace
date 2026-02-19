@@ -22,11 +22,12 @@ export function validateFile(file: File): void {
 
 /**
  * Upload or replace dealer logo. Always overwrites existing.
+ * MUST go to dealer-assets/logos/ (not portfolio) - this is the gig profile picture.
  */
 export async function uploadLogo(userId: string, file: File): Promise<string> {
   validateFile(file);
   const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-  const filePath = `logos/${userId}.${fileExt}`;
+  const filePath = `logos/${userId}.${fileExt}`; // dealer-assets/logos/{userId}.{ext}
 
   const { error: uploadError } = await supabase.storage
     .from(BUCKET)
@@ -47,11 +48,63 @@ export async function uploadLogo(userId: string, file: File): Promise<string> {
     .eq('id', userId);
 
   if (dbError) {
-    // Rollback: delete uploaded file to prevent orphan
     await supabase.storage.from(BUCKET).remove([filePath]);
     throw new Error(dbError.message || 'Failed to update profile');
   }
 
+  return data.publicUrl;
+}
+
+/**
+ * Upload logo to storage only (no DB update).
+ * Use during onboarding before dealer_profiles row exists.
+ * MUST go to dealer-assets/logos/ - this is the gig profile picture.
+ */
+export async function uploadLogoToStorage(userId: string, file: File): Promise<string> {
+  validateFile(file);
+  const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+  const filePath = `logos/${userId}.${fileExt}`; // dealer-assets/logos/
+
+  const { error: uploadError } = await supabase.storage
+    .from(BUCKET)
+    .upload(filePath, file, {
+      upsert: true,
+      contentType: file.type,
+    });
+
+  if (uploadError) {
+    throw new Error(uploadError.message || 'Failed to upload logo');
+  }
+
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
+  return data.publicUrl;
+}
+
+/**
+ * Upload portfolio image to storage only (no DB update).
+ * Use during onboarding before dealer_profiles row exists.
+ * Goes to dealer-assets/portfolio/ (work samples, NOT the gig logo).
+ */
+export async function uploadPortfolioImageToStorage(
+  userId: string,
+  file: File
+): Promise<string> {
+  validateFile(file);
+  const imageId = crypto.randomUUID();
+  const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+  const filePath = `portfolio/${userId}/${imageId}.${fileExt}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(BUCKET)
+    .upload(filePath, file, {
+      contentType: file.type,
+    });
+
+  if (uploadError) {
+    throw new Error(uploadError.message || 'Failed to upload image');
+  }
+
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
   return data.publicUrl;
 }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs';
 import { Card, CardContent } from '../../ui/card';
 import { Button } from '../../ui/button';
@@ -11,6 +11,8 @@ import {
   Shield,
   Eye,
   BarChart3,
+  Share2,
+  Percent,
 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useDealerProfile } from '../../../hooks/useDealerProfile';
@@ -19,16 +21,36 @@ import { PortfolioSection } from './PortfolioSection';
 import { LocationSection } from './LocationSection';
 import { BusinessDetailsSection } from './BusinessDetailsSection';
 import { AccountSecuritySection } from './AccountSecuritySection';
+import { SocialSection } from './SocialSection';
+import { PromotionsSection } from './PromotionsSection';
 
 interface DealerSettingsProps {
   onNavigate?: (view: string) => void;
+  initialTab?: string;
 }
 
-export function DealerSettings({ onNavigate }: DealerSettingsProps) {
+const TAB_MAP: Record<string, string> = {
+  profile: 'profile',
+  portfolio: 'portfolio',
+  location: 'location',
+  business: 'business',
+  social: 'social',
+  promotions: 'promotions',
+  promo: 'promotions',
+  account: 'account',
+};
+
+export function DealerSettings({ onNavigate, initialTab }: DealerSettingsProps) {
   const { currentUser } = useAuth();
   const userId = currentUser?.role === 'detailer' ? currentUser.id : undefined;
   const { data, loading, error, refetch, updateLocal } = useDealerProfile(userId);
   const [activeTab, setActiveTab] = useState('profile');
+
+  useEffect(() => {
+    if (initialTab && TAB_MAP[initialTab]) {
+      setActiveTab(TAB_MAP[initialTab]);
+    }
+  }, [initialTab]);
 
   const completionScore = data
     ? [
@@ -93,49 +115,65 @@ export function DealerSettings({ onNavigate }: DealerSettingsProps) {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 gap-1 h-auto flex-wrap">
-          <TabsTrigger value="profile" className="gap-2">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-1 h-auto flex-wrap p-1 bg-gray-100 rounded-xl">
+          <TabsTrigger value="profile" className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <User className="w-4 h-4" />
             Profile
           </TabsTrigger>
-          <TabsTrigger value="portfolio" className="gap-2">
+          <TabsTrigger value="portfolio" className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <ImageIcon className="w-4 h-4" />
             Portfolio
           </TabsTrigger>
-          <TabsTrigger value="location" className="gap-2">
+          <TabsTrigger value="location" className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <MapPin className="w-4 h-4" />
             Location
           </TabsTrigger>
-          <TabsTrigger value="business" className="gap-2">
+          <TabsTrigger value="business" className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <Briefcase className="w-4 h-4" />
             Business
           </TabsTrigger>
-          <TabsTrigger value="account" className="gap-2">
+          <TabsTrigger value="social" className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+            <Share2 className="w-4 h-4" />
+            Social
+          </TabsTrigger>
+          <TabsTrigger value="promotions" className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+            <Percent className="w-4 h-4" />
+            Promotions
+          </TabsTrigger>
+          <TabsTrigger value="account" className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <Shield className="w-4 h-4" />
             Account
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="profile" className="mt-4">
+        <TabsContent value="profile" className="mt-6">
           <ProfileInfoSection userId={userId!} data={data} onUpdate={updateLocal} />
         </TabsContent>
 
-        <TabsContent value="portfolio" className="mt-4">
+        <TabsContent value="portfolio" className="mt-6">
           <PortfolioSection
             userId={userId!}
             onPortfolioChange={(urls) => updateLocal({ portfolio_images: urls })}
           />
         </TabsContent>
 
-        <TabsContent value="location" className="mt-4">
+        <TabsContent value="location" className="mt-6">
           <LocationSection userId={userId!} data={data} onUpdate={updateLocal} />
         </TabsContent>
 
-        <TabsContent value="business" className="mt-4">
+        <TabsContent value="business" className="mt-6">
           <BusinessDetailsSection userId={userId!} data={data} onUpdate={updateLocal} />
         </TabsContent>
 
-        <TabsContent value="account" className="mt-4">
+        <TabsContent value="social" className="mt-6">
+          <SocialSection userId={userId!} data={data} onUpdate={updateLocal} />
+        </TabsContent>
+
+        <TabsContent value="promotions" className="mt-6">
+          <PromotionsSection userId={userId!} data={data} onUpdate={updateLocal} />
+        </TabsContent>
+
+        <TabsContent value="account" className="mt-6">
           <AccountSecuritySection
             email={currentUser.email}
             onDeleteAccount={() => onNavigate?.('welcome')}

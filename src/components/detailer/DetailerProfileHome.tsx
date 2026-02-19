@@ -18,26 +18,34 @@ import {
 } from 'lucide-react';
 import { cn } from '../ui/utils';
 import { ExposureMetrics } from './ExposureMetrics';
+import { useAuth } from '../../context/AuthContext';
+import { useDealerProfile } from '../../hooks/useDealerProfile';
 
 interface DetailerProfileHomeProps {
   onNavigate?: (view: string, params?: any) => void;
 }
 
 export function DetailerProfileHome({ onNavigate }: DetailerProfileHomeProps) {
+  const { currentUser } = useAuth();
+  const { data: dealerProfile } = useDealerProfile(
+    currentUser?.role === 'detailer' ? currentUser.id : undefined
+  );
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [showTipsModal, setShowTipsModal] = useState(false);
 
-  // Mock data
+  const serviceRadius = dealerProfile?.service_radius_miles ?? (dealerProfile?.services_offered as { serviceRadius?: number })?.serviceRadius ?? 10;
+
+  // Use real dealer profile when available, fallback to mock
   const detailer = {
-    shopName: 'Elite Auto Detailing',
+    shopName: dealerProfile?.business_name ?? 'Elite Auto Detailing',
     tagline: 'Perfection in every detail',
-    bio: 'Premium mobile auto detailing with 10+ years of experience. Specializing in luxury vehicles and paint correction.',
+    bio: dealerProfile?.bio ?? 'Premium mobile auto detailing with 10+ years of experience. Specializing in luxury vehicles and paint correction.',
     rating: 4.9,
     jobCount: 247,
     accountBalance: 3456.50,
     pendingEarnings: 875.00,
     thisMonthEarnings: 8234.00,
-    specialties: [
+    specialties: (dealerProfile?.services_offered as { specialties?: string[] })?.specialties ?? [
       'Paint Correction',
       'Ceramic Coating',
       'Pet Hair Removal',
@@ -45,7 +53,7 @@ export function DetailerProfileHome({ onNavigate }: DetailerProfileHomeProps) {
       'RV Detailing',
       'Fleet Services'
     ],
-    operatingHours: {
+    operatingHours: (dealerProfile?.operating_hours as Record<string, { isOpen: boolean; open: string; close: string }>) ?? {
       monday: { isOpen: true, open: '09:00', close: '18:00' },
       tuesday: { isOpen: true, open: '09:00', close: '18:00' },
       wednesday: { isOpen: true, open: '09:00', close: '18:00' },
@@ -58,8 +66,8 @@ export function DetailerProfileHome({ onNavigate }: DetailerProfileHomeProps) {
       phone: '(415) 555-0123',
       email: 'contact@eliteautodetailing.com',
       website: 'www.eliteautodetailing.com',
-      serviceRadius: '15 miles',
-      city: 'San Francisco, CA'
+      serviceRadius: `${serviceRadius} miles`,
+      city: dealerProfile?.base_location ?? 'Set your location'
     }
   };
 

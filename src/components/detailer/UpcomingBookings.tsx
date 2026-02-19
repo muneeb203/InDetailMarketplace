@@ -1,10 +1,10 @@
 import React from 'react';
-import { Calendar, User, Clock } from 'lucide-react';
+import { Calendar, User, Clock, Loader2 } from 'lucide-react';
 import { cn } from '../ui/utils';
 
 export type BookingStatus = 'confirmed' | 'pending' | 'completed' | 'cancelled';
 
-interface BookingItem {
+export interface BookingItem {
   id: string;
   clientName: string;
   serviceType: string;
@@ -15,6 +15,7 @@ interface BookingItem {
 
 interface UpcomingBookingsProps {
   bookings?: BookingItem[];
+  loading?: boolean;
   className?: string;
 }
 
@@ -25,12 +26,16 @@ const statusConfig: Record<BookingStatus, { label: string; className: string }> 
   cancelled: { label: 'Cancelled', className: 'bg-gray-100 text-gray-600 border-gray-200' },
 };
 
-export function UpcomingBookings({ bookings = [], className }: UpcomingBookingsProps) {
+export function UpcomingBookings({ bookings = [], loading = false, className }: UpcomingBookingsProps) {
   return (
     <div className={cn("bg-white rounded-xl border border-gray-200 shadow-sm", className)}>
       <div className="p-5">
         <h2 className="text-base font-semibold text-gray-900 mb-4">Upcoming bookings</h2>
-        {bookings.length === 0 ? (
+        {loading ? (
+          <div className="py-8 flex items-center justify-center">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          </div>
+        ) : bookings.length === 0 ? (
           <div className="py-8 text-center">
             <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
               <Calendar className="w-6 h-6 text-gray-400" />
@@ -55,7 +60,7 @@ export function UpcomingBookings({ bookings = [], className }: UpcomingBookingsP
                     <p className="text-xs text-gray-600">{b.serviceType}</p>
                     <div className="flex items-center gap-1.5 mt-1 text-xs text-gray-500">
                       <Clock className="w-3.5 h-3.5" />
-                      <span>{b.date} at {b.time}</span>
+                      <span>{b.time === 'TBD' ? b.date : `${b.date} at ${b.time}`}</span>
                     </div>
                   </div>
                   <span className={cn("px-2 py-0.5 rounded-md text-xs font-medium border flex-shrink-0", status.className)}>

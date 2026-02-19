@@ -162,9 +162,9 @@ export function MarketplaceSearch({ detailers, onSelectDetailer, onRequestQuote 
               className="bg-white rounded-xl shadow-sm border overflow-hidden"
             >
               <div className="relative">
-                {detailer.photos.length > 0 && (
+                {(detailer.logo ?? detailer.photos?.[0] ?? detailer.avatar) && (
                   <ImageWithFallback
-                    src={detailer.photos[0]}
+                    src={detailer.logo ?? detailer.photos?.[0] ?? detailer.avatar}
                     alt={detailer.businessName}
                     className="w-full h-48 object-cover"
                   />

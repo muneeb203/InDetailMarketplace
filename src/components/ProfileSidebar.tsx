@@ -1,14 +1,20 @@
 import React from 'react';
 import { User, Mail, Phone, Bell, Car, Edit } from 'lucide-react';
+import type { Vehicle } from '../types';
+import { useClientProfile } from '../hooks/useClientProfile';
 
 interface ProfileSidebarProps {
   userName: string;
   userEmail?: string;
   userPhone?: string;
   userRole: 'client' | 'detailer';
+  clientId?: string;
+  vehicles?: Vehicle[];
 }
 
-export function ProfileSidebar({ userName, userEmail, userPhone, userRole }: ProfileSidebarProps) {
+export function ProfileSidebar({ userName, userEmail, userPhone, userRole, clientId, vehicles: vehiclesProp = [] }: ProfileSidebarProps) {
+  const { vehicles: vehiclesFromDb } = useClientProfile(userRole === 'client' ? clientId : undefined);
+  const vehicles = vehiclesFromDb.length > 0 ? vehiclesFromDb : vehiclesProp;
   return (
     <aside className="w-80 bg-white border-l border-gray-200 overflow-y-auto flex-shrink-0 scrollbar-thin">
       <div className="p-6">
@@ -72,44 +78,53 @@ export function ProfileSidebar({ userName, userEmail, userPhone, userRole }: Pro
         </div>
 
         {/* Individual Vehicles */}
-        <div>
-          <h4 className="font-semibold text-gray-900 mb-3">Individual Vehicles</h4>
-          
-          <div className="bg-gray-50 rounded-xl p-4 mb-3">
-            <div className="flex items-start gap-3">
-              <div className="w-16 h-12 bg-white rounded-lg overflow-hidden">
-                <img
-                  src="https://images.unsplash.com/photo-1560958089-b8a1929cea89?w=200&q=80"
-                  alt="Vehicle"
-                  className="w-full h-full object-cover"
-                />
+        {userRole === 'client' && (
+          <div>
+            <h4 className="font-semibold text-gray-900 mb-3">Individual Vehicles</h4>
+            {vehicles.length === 0 ? (
+              <div className="bg-gray-50 rounded-xl p-4 text-center">
+                <Car className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">No vehicles added yet</p>
+                <p className="text-xs text-gray-400 mt-1">Add your vehicle in Profile settings</p>
               </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between mb-1">
-                  <h5 className="font-semibold text-sm">2022 Tesla Model 3</h5>
-                  <span className="bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full">
-                    Default
-                  </span>
-                </div>
-                <p className="text-xs text-gray-500">Sedan</p>
-                <p className="text-xs text-gray-500">Passenger Car</p>
+            ) : (
+              <div className="space-y-3">
+                {vehicles.map((v) => (
+                  <div key={v.id} className="bg-gray-50 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-16 h-12 bg-white rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0">
+                        {v.photo ? (
+                          <img src={v.photo} alt={`${v.make} ${v.model}`} className="w-full h-full object-cover" />
+                        ) : (
+                          <Car className="w-6 h-6 text-gray-400" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1 gap-2">
+                          <h5 className="font-semibold text-sm truncate">
+                            {v.year} {v.make} {v.model}
+                          </h5>
+                          {v.isDefault && (
+                            <span className="bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full flex-shrink-0">
+                              Default
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500">{v.type ?? 'Vehicle'}</p>
+                        {v.nickname && (
+                          <p className="text-xs text-gray-500 truncate">{v.nickname}</p>
+                        )}
+                        {v.color && (
+                          <p className="text-xs text-gray-500">{v.color}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
+            )}
           </div>
-
-          <div className="bg-gray-50 rounded-xl p-4">
-            <div className="flex items-start gap-3">
-              <div className="w-16 h-12 bg-white rounded-lg flex items-center justify-center">
-                <Car className="w-6 h-6 text-gray-400" />
-              </div>
-              <div className="flex-1">
-                <h5 className="font-semibold text-sm mb-1">Vision Redefined</h5>
-                <p className="text-xs text-gray-500">Electric Sedan</p>
-                <p className="text-xs text-gray-500">Futuristic AI-powered automobile</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
     </aside>
   );

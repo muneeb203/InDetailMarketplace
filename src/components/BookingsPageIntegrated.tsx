@@ -5,76 +5,12 @@ import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Calendar, Clock, DollarSign, MapPin, MessageSquare, Car, User, Phone, Mail, Sparkles } from 'lucide-react';
+import { Calendar, Clock, MapPin, MessageSquare, Car, Phone, Mail, Sparkles, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useClientBookings, type BookingDisplay } from '../hooks/useClientBookings';
+import { toast } from 'sonner';
 
-interface Booking {
-  id: string;
-  serviceType: string;
-  detailerName: string;
-  detailerAvatar: string;
-  vehicleName: string;
-  date: string;
-  time: string;
-  price: number;
-  status: 'requested' | 'accepted' | 'in-progress' | 'completed' | 'cancelled';
-  location: string;
-  detailerPhone: string;
-  detailerEmail: string;
-  serviceDetails: string[];
-  estimatedDuration: string;
-}
-
-const mockBookings: Booking[] = [
-  {
-    id: '1',
-    serviceType: 'Premium Exterior + Interior Detail',
-    detailerName: 'Mike Johnson',
-    detailerAvatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mike',
-    vehicleName: '2022 Tesla Model 3',
-    date: '2025-10-25',
-    time: '10:00 AM',
-    price: 189,
-    status: 'accepted',
-    location: '123 Main St, San Francisco, CA',
-    detailerPhone: '(555) 123-4567',
-    detailerEmail: 'mike@detailpro.com',
-    serviceDetails: ['Exterior Wash', 'Interior Deep Clean', 'Wax & Polish', 'Tire Shine'],
-    estimatedDuration: '3-4 hours',
-  },
-  {
-    id: '2',
-    serviceType: 'Ceramic Coating Application',
-    detailerName: 'Sarah Martinez',
-    detailerAvatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah',
-    vehicleName: '2021 BMW M3',
-    date: '2025-10-22',
-    time: '2:00 PM',
-    price: 599,
-    status: 'in-progress',
-    location: '456 Oak Ave, San Francisco, CA',
-    detailerPhone: '(555) 987-6543',
-    detailerEmail: 'sarah@elitedetail.com',
-    serviceDetails: ['Paint Correction', 'Ceramic Coating', 'Headlight Restoration'],
-    estimatedDuration: '6-8 hours',
-  },
-  {
-    id: '3',
-    serviceType: 'Basic Exterior Wash',
-    detailerName: 'David Chen',
-    detailerAvatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=David',
-    vehicleName: '2020 Honda Civic',
-    date: '2025-10-15',
-    time: '9:00 AM',
-    price: 79,
-    status: 'completed',
-    location: '789 Elm St, San Francisco, CA',
-    detailerPhone: '(555) 456-7890',
-    detailerEmail: 'david@shinedetail.com',
-    serviceDetails: ['Exterior Wash', 'Tire Shine', 'Window Cleaning'],
-    estimatedDuration: '1-2 hours',
-  },
-];
+type Booking = BookingDisplay;
 
 const statusConfig = {
   requested: {
@@ -105,37 +41,63 @@ const statusConfig = {
 };
 
 export function BookingsPageIntegrated({ 
+  clientId,
   onNavigateToMessages,
-  onViewStatus 
+  onViewStatus,
+  onRequestQuote,
 }: { 
-  onNavigateToMessages?: (detailerId: string) => void;
+  clientId?: string;
+  onNavigateToMessages?: (params: { bookingId: string; dealerId: string }) => void;
   onViewStatus?: (bookingId: string) => void;
+  onRequestQuote?: () => void;
 }) {
   const [selectedTab, setSelectedTab] = useState('upcoming');
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [bookingToCancel, setBookingToCancel] = useState<Booking | null>(null);
-  const [bookings, setBookings] = useState(mockBookings);
+  const [cancelling, setCancelling] = useState(false);
 
-  const handleCancelBooking = (bookingId: string) => {
-    setBookings(bookings.map(b => 
-      b.id === bookingId ? { ...b, status: 'cancelled' as const } : b
-    ));
-    setBookingToCancel(null);
-    setSelectedBooking(null);
+  const { bookings, loading, cancelOrder } = useClientBookings(clientId);
+
+  const handleCancelBooking = async (bookingId: string) => {
+    setCancelling(true);
+    try {
+      await cancelOrder(bookingId);
+      setBookingToCancel(null);
+      setSelectedBooking(null);
+      toast.success('Booking cancelled');
+    } catch {
+      toast.error('Failed to cancel booking');
+    } finally {
+      setCancelling(false);
+    }
   };
 
-  const filterBookings = (status: string) => {
-    if (status === 'upcoming') {
-      return bookings.filter(b => ['requested', 'accepted', 'in-progress'].includes(b.status));
-    } else if (status === 'completed') {
+  const filterBookings = (tab: string) => {
+    if (tab === 'upcoming') {
+      return bookings.filter(b => b.status === 'requested');
+    }
+    if (tab === 'accepted') {
+      return bookings.filter(b => ['accepted', 'in-progress'].includes(b.status));
+    }
+    if (tab === 'completed') {
       return bookings.filter(b => b.status === 'completed');
-    } else if (status === 'cancelled') {
+    }
+    if (tab === 'cancelled') {
       return bookings.filter(b => b.status === 'cancelled');
     }
     return bookings;
   };
 
   const filteredBookings = filterBookings(selectedTab);
+
+  if (loading) {
+    return (
+      <div className="h-full flex flex-col bg-gradient-to-b from-[#EAF5FF] to-white items-center justify-center">
+        <Loader2 className="w-10 h-10 animate-spin text-[#0078FF]" />
+        <p className="mt-3 text-sm text-gray-600">Loading bookings...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col bg-gradient-to-b from-[#EAF5FF] to-white overflow-hidden">
@@ -159,9 +121,12 @@ export function BookingsPageIntegrated({
         <div className="px-4 py-4 space-y-4">
           {/* Tabs */}
           <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-            <TabsList className="grid w-full grid-cols-3 h-10 bg-white rounded-xl p-1 shadow-sm">
+            <TabsList className="grid w-full grid-cols-4 h-10 bg-white rounded-xl p-1 shadow-sm">
               <TabsTrigger value="upcoming" className="rounded-lg text-xs data-[state=active]:bg-[#0078FF] data-[state=active]:text-white">
                 Upcoming
+              </TabsTrigger>
+              <TabsTrigger value="accepted" className="rounded-lg text-xs data-[state=active]:bg-[#0078FF] data-[state=active]:text-white">
+                Accepted
               </TabsTrigger>
               <TabsTrigger value="completed" className="rounded-lg text-xs data-[state=active]:bg-[#0078FF] data-[state=active]:text-white">
                 Completed
@@ -235,7 +200,7 @@ export function BookingsPageIntegrated({
                           </div>
                           <div className="flex items-center gap-1.5 text-gray-700">
                             <Clock className="w-3 h-3 text-[#0078FF]" />
-                            {booking.time}
+                            {booking.time === 'TBD' ? 'TBD' : booking.time}
                           </div>
                         </div>
 
@@ -261,7 +226,7 @@ export function BookingsPageIntegrated({
                           </Button>
                           {booking.status !== 'cancelled' && booking.status !== 'completed' && (
                             <Button
-                              onClick={() => onNavigateToMessages?.(booking.id)}
+                              onClick={() => onNavigateToMessages?.({ bookingId: booking.id, dealerId: booking.dealerId })}
                               variant="outline"
                               size="sm"
                               className="flex-1 h-8 text-xs"
@@ -294,9 +259,9 @@ export function BookingsPageIntegrated({
                     : `You don't have any ${selectedTab} bookings.`
                   }
                 </p>
-                {selectedTab === 'upcoming' && (
-                  <Button size="sm" className="bg-[#0078FF] hover:bg-[#0056CC] text-white h-8 text-xs">
-                    Request Quote
+                {selectedTab === 'upcoming' && onRequestQuote && (
+                  <Button onClick={onRequestQuote} size="sm" className="bg-[#0078FF] hover:bg-[#0056CC] text-white h-8 text-xs">
+                    Request Service
                   </Button>
                 )}
               </motion.div>
@@ -351,14 +316,14 @@ export function BookingsPageIntegrated({
                   </div>
                   <div className="flex items-center gap-2">
                     <Clock className="w-3 h-3 text-[#0078FF]" />
-                    <span className="text-gray-700">{selectedBooking.time} • {selectedBooking.estimatedDuration}</span>
+                    <span className="text-gray-700">{selectedBooking.time === 'TBD' ? 'Time TBD' : `${selectedBooking.time} • ${selectedBooking.estimatedDuration}`}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Service Details */}
+              {/* Service Details / Notes */}
               <div>
-                <p className="text-xs mb-2">Services Included:</p>
+                <p className="text-xs mb-2">Details</p>
                 <div className="flex flex-wrap gap-1.5">
                   {selectedBooking.serviceDetails.map((service, idx) => (
                     <Badge key={idx} variant="outline" className="bg-blue-50 text-[#0078FF] border-blue-200 text-xs">
@@ -404,7 +369,7 @@ export function BookingsPageIntegrated({
                 {selectedBooking.status !== 'cancelled' && selectedBooking.status !== 'completed' && (
                   <>
                     <Button
-                      onClick={() => onNavigateToMessages?.(selectedBooking.id)}
+                      onClick={() => onNavigateToMessages?.({ bookingId: selectedBooking.id, dealerId: selectedBooking.dealerId })}
                       size="sm"
                       className="flex-1 bg-[#0078FF] hover:bg-[#0056CC] text-white h-9 text-xs"
                     >
@@ -412,14 +377,13 @@ export function BookingsPageIntegrated({
                       Message Detailer
                     </Button>
                     <Button
-                      onClick={() => {
-                        setBookingToCancel(selectedBooking);
-                      }}
+                      onClick={() => setBookingToCancel(selectedBooking)}
                       variant="outline"
                       size="sm"
+                      disabled={cancelling}
                       className="border-red-300 text-red-600 hover:bg-red-50 h-9 text-xs"
                     >
-                      Cancel
+                      {cancelling ? 'Cancelling...' : 'Cancel'}
                     </Button>
                   </>
                 )}
@@ -444,12 +408,13 @@ export function BookingsPageIntegrated({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="text-xs">Keep Booking</AlertDialogCancel>
+            <AlertDialogCancel className="text-xs" disabled={cancelling}>Keep Booking</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => bookingToCancel && handleCancelBooking(bookingToCancel.id)}
+              disabled={cancelling}
               className="bg-red-600 hover:bg-red-700 text-xs"
             >
-              Cancel Booking
+              {cancelling ? 'Cancelling...' : 'Cancel Booking'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

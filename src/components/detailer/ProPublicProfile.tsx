@@ -44,13 +44,17 @@ export function ProPublicProfile({ onNavigate }: ProPublicProfileProps = {}) {
     }
   };
 
+  const serviceRadius = dealerProfile?.service_radius_miles ?? (dealerProfile?.services_offered as { serviceRadius?: number })?.serviceRadius ?? 10;
+  const dealerServices = (dealerProfile?.services_offered as { specialties?: string[] })?.specialties ?? [];
+
   // Use real dealer profile when available, fallback to mock
   const detailer = {
     logo: dealerProfile?.logo_url ?? undefined,
     shopName: dealerProfile?.business_name ?? 'Elite Auto Detailing',
     tagline: 'Perfection in every detail',
-    city: dealerProfile?.base_location ?? 'San Francisco',
-    radiusBadge: '15 mi radius',
+    city: dealerProfile?.base_location ?? 'Set your location',
+    radiusBadge: `${serviceRadius} mi radius`,
+    serviceTags: dealerServices,
     badges: {
       verified: true,
       insured: true,
@@ -74,15 +78,13 @@ export function ProPublicProfile({ onNavigate }: ProPublicProfileProps = {}) {
     { id: '4', before: '', after: '', caption: 'Headlight Restoration', tags: ['headlight restore'] },
   ];
 
-  const services = [
-    { name: 'Exterior Wash & Wax', price: 'From $89', time: '1-2 hours' },
-    { name: 'Interior Deep Clean', price: 'From $129', time: '2-3 hours' },
-    { name: 'Full Detail Package', price: 'From $249', time: '4-5 hours' },
-    { name: 'Paint Correction', price: 'From $399', time: '6-8 hours' },
-    { name: 'Ceramic Coating', price: 'From $899', time: '2 days' },
-    { name: 'RV Detailing', price: 'From $499', time: 'Half day' },
-    { name: 'Fleet Services', price: 'Custom pricing', time: 'Flexible' },
-  ];
+  const services = dealerServices.length > 0
+    ? dealerServices.map((name) => ({ name, price: 'Custom', time: '—' }))
+    : [
+        { name: 'Exterior Wash & Wax', price: 'From $89', time: '1-2 hours' },
+        { name: 'Interior Deep Clean', price: 'From $129', time: '2-3 hours' },
+        { name: 'Full Detail Package', price: 'From $249', time: '4-5 hours' },
+      ];
 
   const reviews = [
     { id: '1', author: 'Sarah M.', rating: 5, text: 'Incredible attention to detail! My car looks brand new. Elite removed all the pet hair and the smell is completely gone.', tags: ['on time', 'pet hair wizard'] },

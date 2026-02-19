@@ -26,9 +26,9 @@ export function MarketplaceWeb({ detailers, onSelectDetailer, onRequestQuote }: 
           >
             {/* Image */}
             <div className="relative h-48 bg-gray-900">
-              {detailer.photos && detailer.photos.length > 0 ? (
+              {(detailer.logo ?? detailer.photos?.[0] ?? detailer.avatar) ? (
                 <img
-                  src={detailer.photos[0]}
+                  src={detailer.logo ?? detailer.photos?.[0] ?? detailer.avatar}
                   alt={detailer.businessName}
                   className="w-full h-full object-cover"
                 />

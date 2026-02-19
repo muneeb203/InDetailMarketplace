@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Edit3, Share2, Lightbulb, X, Megaphone } from 'lucide-react';
+import { Share2, Lightbulb, X } from 'lucide-react';
 import { BrandHeader } from './BrandHeader';
 import { ExposureMetrics } from './ExposureMetrics';
 import { PromoBanner } from './PromoBanner';
@@ -7,24 +7,21 @@ import { ServiceSummaryCard } from './ServiceSummaryCard';
 import { ActivityFeed } from './ActivityFeed';
 import { UpcomingBookings } from './UpcomingBookings';
 import { ShareQRPanel } from './ShareQRPanel';
+import { DealerOrdersQueue } from './DealerOrdersQueue';
 import { useAuth } from '../../context/AuthContext';
 import { useDealerProfile } from '../../hooks/useDealerProfile';
+import { useExposureMetrics } from '../../hooks/useExposureMetrics';
+import { useUpcomingBookings } from '../../hooks/useUpcomingBookings';
 
 interface ProDashboardProps {
   onNavigate?: (view: string, params?: any) => void;
 }
 
-const defaultServices = ['Full Detail', 'Exterior Wash', 'Interior Detail', 'Ceramic Coating'];
 const defaultActivity = [
   { id: '1', type: 'lead' as const, title: 'New lead opened', time: '2 hours ago' },
   { id: '2', type: 'view' as const, title: 'Profile viewed 15 times', time: 'Today' },
   { id: '3', type: 'quote_accepted' as const, title: 'Quote accepted', time: 'Yesterday' },
 ];
-const defaultBookings = [
-  { id: '1', clientName: 'Sarah M.', serviceType: 'Full Detail', date: 'Tomorrow', time: '2:00 PM', status: 'confirmed' as const },
-  { id: '2', clientName: 'James K.', serviceType: 'Interior Detail', date: 'Dec 30', time: '10:00 AM', status: 'pending' as const },
-];
-
 export function ProDashboard({ onNavigate }: ProDashboardProps) {
   const { currentUser } = useAuth();
   const { data: dealerProfile } = useDealerProfile(
@@ -33,33 +30,46 @@ export function ProDashboard({ onNavigate }: ProDashboardProps) {
   const [showSharePanel, setShowSharePanel] = useState(false);
   const [showTipsModal, setShowTipsModal] = useState(false);
 
+  const serviceRadius = dealerProfile?.service_radius_miles ?? (dealerProfile?.services_offered as { serviceRadius?: number })?.serviceRadius ?? 10;
+  const dealerServices = (dealerProfile?.services_offered as { specialties?: string[] })?.specialties ?? [];
+
   const detailer = {
     logo: dealerProfile?.logo_url ?? undefined,
     shopName: dealerProfile?.business_name ?? 'Elite Auto Detailing',
     tagline: 'Perfection in every detail',
-    city: 'San Francisco',
-    radiusBadge: '15 mi radius',
+    city: dealerProfile?.base_location ?? 'Set your location',
+    radiusBadge: `${serviceRadius} mi radius`,
     badges: { verified: true, insured: true },
     rating: 4.9,
     jobCount: 247,
-    serviceTags: ['Car Wash', 'Detailing', 'Interior Cleaning'],
+    serviceTags: dealerServices,
   };
 
-  const metrics = {
-    profileViews: { value: 1247, change: 12, trend: 'up' as const },
-    saves: { value: 89, change: 8, trend: 'up' as const },
-    leadOpens: { value: 156, change: -5, trend: 'down' as const },
-    quoteAcceptRate: { value: 68, change: 3, trend: 'up' as const },
-  };
+  const { metrics, period, setPeriod, loading: metricsLoading } = useExposureMetrics(
+    currentUser?.role === 'detailer' ? currentUser.id : undefined
+  );
+  const { bookings: upcomingBookings, loading: bookingsLoading } = useUpcomingBookings(
+    currentUser?.role === 'detailer' ? currentUser.id : undefined
+  );
 
-  const promo = {
-    title: '20% Off First Service',
-    description: 'New customers get 20% off their first detailing service',
-    startDate: 'Dec 1',
-    endDate: 'Dec 31',
-    active: true,
-    performanceIndicator: '+23% more visibility',
-  };
+  const dealerPromo = (dealerProfile?.promo as { title?: string; description?: string; startDate?: string; endDate?: string; active?: boolean }) | undefined;
+  const promo = dealerPromo?.active && dealerPromo?.title
+    ? {
+        title: dealerPromo.title,
+        description: dealerPromo.description ?? '',
+        startDate: dealerPromo.startDate ?? '',
+        endDate: dealerPromo.endDate ?? '',
+        active: true,
+        performanceIndicator: '+23% more visibility',
+      }
+    : {
+        title: '',
+        description: '',
+        startDate: '',
+        endDate: '',
+        active: false,
+        performanceIndicator: '',
+      };
 
   const tips = [
     { title: 'Add 3 new before/after photos', description: 'Profiles with fresh photos get 40% more views' },
@@ -67,10 +77,9 @@ export function ProDashboard({ onNavigate }: ProDashboardProps) {
     { title: 'Pin a short intro video', description: 'Video intros build trust and boost bookings' },
   ];
 
-  const handleEditGig = () => onNavigate?.('pro-profile-editor', { tab: 'brand' });
-  const handlePromote = () => onNavigate?.('pro-profile-editor', { tab: 'brand', section: 'promo' });
   const handleShare = () => setShowSharePanel(true);
   const handleRequestOffer = () => onNavigate?.('pro-public-profile');
+  const handleOpenSettings = (tab?: string) => onNavigate?.('settings', tab ? { tab } : {});
 
   return (
     <div className="w-full bg-gradient-to-b from-gray-50 to-white min-h-full">
@@ -91,37 +100,21 @@ export function ProDashboard({ onNavigate }: ProDashboardProps) {
             />
 
             <ServiceSummaryCard
-              services={defaultServices}
+              services={dealerServices}
               startingPrice="$99"
               estimatedTime="2–4 hrs"
-              serviceRadius="15 mi"
+              serviceRadius={`${serviceRadius} mi`}
               onRequestOffer={handleRequestOffer}
             />
 
-            {/* Quick actions: Edit Gig, Promote, Share */}
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                onClick={handleEditGig}
-                className="h-24 rounded-xl bg-white border border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 transition-all active:scale-[0.98] flex flex-col items-center justify-center gap-2"
-              >
-                <Edit3 className="w-5 h-5 text-gray-700" />
-                <span className="text-xs font-medium text-gray-700">Edit Gig</span>
-              </button>
-              <button
-                onClick={handlePromote}
-                className="h-24 rounded-xl bg-white border border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 transition-all active:scale-[0.98] flex flex-col items-center justify-center gap-2"
-              >
-                <Megaphone className="w-5 h-5 text-gray-700" />
-                <span className="text-xs font-medium text-gray-700">Promote</span>
-              </button>
-              <button
-                onClick={handleShare}
-                className="h-24 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-all active:scale-[0.98] flex flex-col items-center justify-center gap-2 shadow-sm"
-              >
-                <Share2 className="w-5 h-5" />
-                <span className="text-xs font-medium">Share</span>
-              </button>
-            </div>
+            {/* Share */}
+            <button
+              onClick={handleShare}
+              className="w-full h-14 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-all active:scale-[0.98] flex flex-col items-center justify-center gap-2 shadow-sm"
+            >
+              <Share2 className="w-5 h-5" />
+              <span className="text-sm font-medium">Share Profile</span>
+            </button>
 
             {/* Trust: response time */}
             <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -131,18 +124,29 @@ export function ProDashboard({ onNavigate }: ProDashboardProps) {
             </div>
           </div>
 
-          {/* Right: Metrics, promo, activity, bookings */}
+          {/* Right: Metrics, promo, orders, activity, bookings */}
           <div className="lg:col-span-2 space-y-5">
-            <ExposureMetrics {...metrics} onTipsClick={() => setShowTipsModal(true)} />
+            <ExposureMetrics
+              {...metrics}
+              period={period}
+              onPeriodChange={setPeriod}
+              loading={metricsLoading}
+              onTipsClick={() => setShowTipsModal(true)}
+            />
+
+            {/* Orders Queue */}
+            {currentUser?.role === 'detailer' && (
+              <DealerOrdersQueue dealerId={currentUser.id} onNavigate={onNavigate} />
+            )}
 
             <PromoBanner
               {...promo}
-              onCreatePromo={() => onNavigate?.('pro-profile-editor', { tab: 'brand', section: 'promo' })}
+              onCreatePromo={() => handleOpenSettings('promotions')}
             />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <ActivityFeed items={defaultActivity} />
-              <UpcomingBookings bookings={defaultBookings} />
+              <UpcomingBookings bookings={upcomingBookings} loading={bookingsLoading} />
             </div>
 
             {/* Performance summary */}
