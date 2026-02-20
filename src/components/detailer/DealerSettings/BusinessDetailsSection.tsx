@@ -20,11 +20,12 @@ const SPECIALTIES = [
   'Headlight Restoration',
 ];
 
+/** Only value ($, $$, $$$, $$$$) is saved to dealer_profiles.price_range */
 const PRICE_RANGES = [
-  { value: '$', label: '$', description: 'Budget' },
-  { value: '$$', label: '$$', description: 'Moderate' },
-  { value: '$$$', label: '$$$', description: 'Premium' },
-  { value: '$$$$', label: '$$$$', description: 'Luxury' },
+  { value: '$', label: '$' },
+  { value: '$$', label: '$$' },
+  { value: '$$$', label: '$$$' },
+  { value: '$$$$', label: '$$$$' },
 ];
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -153,7 +154,7 @@ export function BusinessDetailsSection({
                 size="sm"
                 onClick={() => setPriceRange(r.value)}
               >
-                {r.label} {r.description}
+                {r.label}
               </Button>
             ))}
           </div>

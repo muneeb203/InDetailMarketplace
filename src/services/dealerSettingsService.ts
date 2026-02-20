@@ -5,6 +5,15 @@
 
 import { supabase } from '../lib/supabaseClient';
 
+/** Valid price range values - stored exactly as $, $$, $$$, or $$$$ */
+const VALID_PRICE_RANGES = ['$', '$$', '$$$', '$$$$'] as const;
+
+function normalizePriceRange(value: string | undefined): string | undefined {
+  if (value == null || value === '') return undefined;
+  const v = value.trim();
+  return VALID_PRICE_RANGES.includes(v as any) ? v : undefined;
+}
+
 export type CommPreference = 'chat' | 'voice' | 'voice-chat';
 
 export interface ProfileInfoUpdate {
@@ -46,9 +55,18 @@ export async function updateDealerProfile(
     | ServiceRadiusUpdate
     | PromoUpdate
 ) {
+  const sanitized = { ...updates };
+  if ('price_range' in sanitized && sanitized.price_range != null) {
+    const normalized = normalizePriceRange(sanitized.price_range);
+    if (normalized !== undefined) {
+      (sanitized as BusinessDetailsUpdate).price_range = normalized;
+    } else {
+      delete (sanitized as Record<string, unknown>).price_range;
+    }
+  }
   const { error } = await supabase
     .from('dealer_profiles')
-    .update(updates)
+    .update(sanitized)
     .eq('id', userId);
 
   if (error) throw error;

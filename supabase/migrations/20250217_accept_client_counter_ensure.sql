@@ -1,6 +1,5 @@
--- RPC for client to accept a countered offer (bypasses RLS issues)
--- Ensures only the order's client can accept, and only when status is 'countered'
-CREATE OR REPLACE FUNCTION accept_client_counter(p_order_id uuid)
+-- Ensure accept_client_counter exists (in case original migration wasn't applied)
+CREATE OR REPLACE FUNCTION public.accept_client_counter(p_order_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -39,5 +38,4 @@ BEGIN
 END;
 $$;
 
--- Grant execute to authenticated users
-GRANT EXECUTE ON FUNCTION accept_client_counter(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.accept_client_counter(uuid) TO authenticated;

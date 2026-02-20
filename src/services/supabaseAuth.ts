@@ -1,5 +1,13 @@
 import { supabase } from '../lib/supabaseClient';
 
+/** Valid price range values for dealer_profiles.price_range - stored exactly as-is */
+const VALID_PRICE_RANGES = ['$', '$$', '$$$', '$$$$'] as const;
+
+function normalizePriceRange(value: string): string {
+  const v = value?.trim();
+  return VALID_PRICE_RANGES.includes(v as any) ? v : '$$';
+}
+
 export type AppRole = 'client' | 'detailer';
 export type DbRole = 'client' | 'dealer' | 'admin';
 
@@ -106,6 +114,8 @@ export async function createDealerProfile(params: {
     serviceRadius,
   };
 
+  const price_range = normalizePriceRange(priceRange);
+
   const { error: dealerError } = await supabase.from('dealer_profiles').upsert(
     {
       id: userId,
@@ -114,7 +124,7 @@ export async function createDealerProfile(params: {
       location_lat: locationLat,
       location_lng: locationLng,
       services_offered,
-      price_range: priceRange,
+      price_range,
       logo_url: logoUrl ?? null,
       portfolio_images: portfolioImages,
     },

@@ -73,10 +73,10 @@ export function BookingsPageIntegrated({
     }
   }, [completedIdsKey]);
 
-  const handleCancelBooking = async (bookingId: string) => {
+  const handleCancelBooking = async (bookingId: string, bookingStatus?: string) => {
     setCancelling(true);
     try {
-      await cancelOrder(bookingId);
+      await cancelOrder(bookingId, bookingStatus);
       setBookingToCancel(null);
       setSelectedBooking(null);
       toast.success('Booking cancelled');
@@ -475,7 +475,7 @@ export function BookingsPageIntegrated({
           <AlertDialogFooter>
             <AlertDialogCancel className="text-xs" disabled={cancelling}>Keep Booking</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => bookingToCancel && handleCancelBooking(bookingToCancel.id)}
+              onClick={() => bookingToCancel && handleCancelBooking(bookingToCancel.id, bookingToCancel.status)}
               disabled={cancelling}
               className="bg-red-600 hover:bg-red-700 text-xs"
             >

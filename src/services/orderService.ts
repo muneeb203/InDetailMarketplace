@@ -193,6 +193,22 @@ export async function clientAcceptCounter(orderId: string): Promise<Order> {
   return enriched ?? order;
 }
 
+/**
+ * Client rejects/cancels a countered offer via RPC (bypasses RLS).
+ * Use this when client cancels from 'countered' status.
+ */
+export async function clientRejectOrder(orderId: string): Promise<Order> {
+  const { data, error } = await supabase.rpc('client_reject_order', {
+    p_order_id: orderId,
+  });
+
+  if (error) throw error;
+  const row = data as Record<string, unknown>;
+  const order = mapRowToOrder(row);
+  const enriched = await enrichSingleOrderWithDealer(order);
+  return enriched ?? order;
+}
+
 export function subscribeToClientOrders(
   clientId: string,
   onInsert: (order: Order) => void,

@@ -40,11 +40,12 @@ const SPECIALTIES = [
   'Headlight Restoration',
 ];
 
+/** Price range options - only value ($, $$, $$$, $$$$) is saved to dealer_profiles.price_range */
 const PRICE_RANGES = [
-  { value: '$', label: '$', description: 'Budget-friendly' },
-  { value: '$$', label: '$$', description: 'Mid-range' },
-  { value: '$$$', label: '$$$', description: 'Premium' },
-  { value: '$$$$', label: '$$$$', description: 'Luxury' },
+  { value: '$', label: '$' },
+  { value: '$$', label: '$$' },
+  { value: '$$$', label: '$$$' },
+  { value: '$$$$', label: '$$$$' },
 ];
 
 const MAX_PORTFOLIO_ONBOARDING = 5;
@@ -240,6 +241,7 @@ export function DetailerOnboarding({
     if (step === 2) return location.trim().length > 0 && locationLat !== null && locationLng !== null;
     if (step === 3) return selectedSpecialties.length > 0;
     if (step === 4) return priceRange.length > 0;
+    if (step === 5) return !!logoUrl;
     return true;
   };
 
@@ -502,10 +504,7 @@ export function DetailerOnboarding({
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <div className="text-left">
-                          <p className="text-sm">{range.label}</p>
-                          <p className="text-xs text-gray-600">{range.description}</p>
-                        </div>
+                        <span className="text-lg font-medium">{range.label}</span>
                         {priceRange === range.value && (
                           <Check className="w-5 h-5 text-blue-600" />
                         )}
@@ -527,12 +526,11 @@ export function DetailerOnboarding({
                 <div className="text-center space-y-2">
                   <h3>Add your profile picture & portfolio</h3>
                   <p className="text-sm text-gray-600">
-                    First image = gig logo (logos folder). Rest = portfolio (optional)
+                    First image = gig logo. Add more for your portfolio
                   </p>
                 </div>
 
-                {!skipPortfolio ? (
-                  <div className="space-y-3">
+                <div className="space-y-3">
                     <div
                       onClick={() => !portfolioUploading && portfolioInputRef.current?.click()}
                       onDrop={handlePortfolioDrop}
@@ -600,22 +598,9 @@ export function DetailerOnboarding({
                       <p className="text-sm text-red-600 text-center">{portfolioError}</p>
                     )}
                     <p className="text-xs text-gray-500 text-center">
-                      {(logoUrl ? 1 : 0) + portfolioImages.length}/5 • First = gig logo (logos folder)
+                      {(logoUrl ? 1 : 0) + portfolioImages.length}/5 • First = gig logo
                     </p>
                   </div>
-                ) : (
-                  <div className="text-center py-8 text-gray-500 text-sm">
-                    You can add portfolio photos later in your profile
-                  </div>
-                )}
-
-                <Button
-                  variant="ghost"
-                  className="w-full"
-                  onClick={() => setSkipPortfolio(!skipPortfolio)}
-                >
-                  {skipPortfolio ? 'Add Photo' : 'Skip for Now'}
-                </Button>
               </div>
             </Card>
           )}

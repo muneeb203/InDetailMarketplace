@@ -137,8 +137,7 @@ export function ClientOnboarding({ userName, onComplete }: ClientOnboardingProps
 
   const hasValidLocation = locationLat != null && locationLng != null;
 
-  // Step 2: Vehicle (optional)
-  const [skipVehicle, setSkipVehicle] = useState(false);
+  // Step 2: Vehicle
   const [vehicleMake, setVehicleMake] = useState('');
   const [vehicleModel, setVehicleModel] = useState('');
   const [vehicleYear, setVehicleYear] = useState('');
@@ -227,7 +226,7 @@ export function ClientOnboarding({ userName, onComplete }: ClientOnboardingProps
       location_lat: locationLat,
       location_lng: locationLng,
       vehicle:
-        !skipVehicle && vehicleMake && vehicleModel && validYear != null
+        vehicleMake && vehicleModel && validYear != null
           ? {
               make: vehicleMake,
               model: vehicleModel,
@@ -244,7 +243,7 @@ export function ClientOnboarding({ userName, onComplete }: ClientOnboardingProps
 
   const canProceed = () => {
     if (step === 1) return hasValidLocation;
-    if (step === 2) return skipVehicle || (vehicleMake && vehicleModel && vehicleYear && isYearValid);
+    if (step === 2) return vehicleMake && vehicleModel && vehicleYear && isYearValid;
     return true;
   };
 
@@ -358,13 +357,12 @@ export function ClientOnboarding({ userName, onComplete }: ClientOnboardingProps
                 <div className="text-center space-y-2">
                   <h3>Tell us about your vehicle</h3>
                   <p className="text-sm text-gray-600">
-                    This helps us provide accurate quotes (optional)
+                    This helps us provide accurate quotes
                   </p>
                 </div>
 
-                {!skipVehicle ? (
-                  <>
-                    <div className="relative overflow-visible">
+                <div className="space-y-4">
+                  <div className="relative overflow-visible">
                       <label className="text-sm mb-2 block">Make</label>
                       <Popover
                         open={makeOpen}
@@ -523,20 +521,7 @@ export function ClientOnboarding({ userName, onComplete }: ClientOnboardingProps
                         </p>
                       )}
                     </div>
-                  </>
-                ) : (
-                  <div className="text-center py-8 text-gray-500 text-sm">
-                    You can add vehicle details later in your profile
-                  </div>
-                )}
-
-                <Button
-                  variant="ghost"
-                  className="w-full"
-                  onClick={() => setSkipVehicle(!skipVehicle)}
-                >
-                  {skipVehicle ? 'Add Vehicle' : 'Skip for Now'}
-                </Button>
+                </div>
               </div>
             </Card>
           )}

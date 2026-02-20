@@ -86,15 +86,28 @@ export async function fetchDealerReviews(dealerId: string): Promise<DealerReview
 }
 
 export async function fetchDealerRating(dealerId: string): Promise<{ rating: number; review_count: number }> {
-  const { data, error } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('dealer_profiles')
     .select('rating, review_count')
     .eq('id', dealerId)
     .single();
 
-  if (error) throw error;
-  return {
-    rating: Number(data?.rating ?? 0),
-    review_count: Number(data?.review_count ?? 0),
+  if (profileError) throw profileError;
+  const fromProfile = {
+    rating: Number(profile?.rating ?? 0),
+    review_count: Number(profile?.review_count ?? 0),
   };
+
+  // Fallback: if dealer_profiles has 0 but reviews exist, compute from dealer_reviews
+  if (fromProfile.review_count === 0) {
+    const { data: reviews } = await supabase
+      .from('dealer_reviews')
+      .select('rating')
+      .eq('dealer_id', dealerId);
+    if (reviews?.length) {
+      const avg = reviews.reduce((s, r) => s + Number(r.rating), 0) / reviews.length;
+      return { rating: Math.round(avg * 10) / 10, review_count: reviews.length };
+    }
+  }
+  return fromProfile;
 }

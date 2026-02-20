@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Detailer } from '../types';
-import { Search, MapPin, Star, SlidersHorizontal, Navigation, Phone, Video } from 'lucide-react';
+import { Search, MapPin, Star, SlidersHorizontal, Navigation, Phone, Video, RotateCcw } from 'lucide-react';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { TrustBadges } from './TrustBadges';
@@ -20,19 +20,47 @@ import { toast } from "sonner";
 
 interface MarketplaceSearchEnhancedProps {
   detailers: Detailer[];
+  /** Controlled search - filters dealer_profiles.business_name via API (debounced by parent) */
+  searchQuery?: string;
+  onSearchChange?: (query: string) => void;
+  /** Controlled filters - when provided, filters are applied via API and parent owns state */
+  sortBy?: 'relevance' | 'distance' | 'rating';
+  onSortByChange?: (v: 'relevance' | 'distance' | 'rating') => void;
+  priceFilter?: string;
+  onPriceFilterChange?: (v: string) => void;
+  serviceFilter?: string;
+  onServiceFilterChange?: (v: string) => void;
   onSelectDetailer: (detailer: Detailer) => void;
   onRequestQuote: (detailer: Detailer) => void;
 }
 
 export function MarketplaceSearchEnhanced({
   detailers,
+  searchQuery: searchQueryProp,
+  onSearchChange,
+  sortBy: sortByProp,
+  onSortByChange,
+  priceFilter: priceFilterProp,
+  onPriceFilterChange,
+  serviceFilter: serviceFilterProp,
+  onServiceFilterChange,
   onSelectDetailer,
   onRequestQuote,
 }: MarketplaceSearchEnhancedProps) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'relevance' | 'distance' | 'rating'>('relevance');
-  const [priceFilter, setPriceFilter] = useState<string>('all');
-  const [serviceFilter, setServiceFilter] = useState<string>('all');
+  const [localSearch, setLocalSearch] = useState('');
+  const isControlled = onSearchChange != null;
+  const searchQuery = isControlled ? (searchQueryProp ?? '') : localSearch;
+  const setSearchQuery = isControlled ? (v: string) => onSearchChange!(v) : setLocalSearch;
+  const filtersControlled = onSortByChange != null && onPriceFilterChange != null && onServiceFilterChange != null;
+  const [localSortBy, setLocalSortBy] = useState<'relevance' | 'distance' | 'rating'>('relevance');
+  const [localPriceFilter, setLocalPriceFilter] = useState<string>('all');
+  const [localServiceFilter, setLocalServiceFilter] = useState<string>('all');
+  const sortBy = filtersControlled ? (sortByProp ?? 'relevance') : localSortBy;
+  const setSortBy = filtersControlled ? (v: 'relevance' | 'distance' | 'rating') => onSortByChange!(v) : setLocalSortBy;
+  const priceFilter = filtersControlled ? (priceFilterProp ?? 'all') : localPriceFilter;
+  const setPriceFilter = filtersControlled ? (v: string) => onPriceFilterChange!(v) : setLocalPriceFilter;
+  const serviceFilter = filtersControlled ? (serviceFilterProp ?? 'all') : localServiceFilter;
+  const setServiceFilter = filtersControlled ? (v: string) => onServiceFilterChange!(v) : setLocalServiceFilter;
   const [showCallbackModal, setShowCallbackModal] = useState(false);
   const [selectedDetailerForCallback, setSelectedDetailerForCallback] = useState<Detailer | null>(null);
   const { location, loading: geoLoading } = useGeolocation();
@@ -48,48 +76,26 @@ export function MarketplaceSearchEnhanced({
   };
 
   const rankedDetailers = useMemo(() => {
-    if (!location) return [];
+    // Use location or fallback (NYC) so we always show results
+    const coords = location ?? { latitude: 40.7128, longitude: -74.006 };
 
     const params = {
-      userLat: location.latitude,
-      userLng: location.longitude,
+      userLat: coords.latitude,
+      userLng: coords.longitude,
       serviceFilter: serviceFilter !== 'all' ? serviceFilter : undefined,
       sortBy,
     };
 
     let ranked = rankDetailers(detailers, params);
 
-    // Search filter - robust matching across business name, bio, services, specialties, location, name
-    const q = searchQuery?.trim().toLowerCase();
-    if (q) {
-      ranked = ranked.filter((d) => {
-        const businessName = (d.businessName ?? '').toLowerCase();
-        const bio = (d.bio ?? '').toLowerCase();
-        const loc = (d.location ?? '').toLowerCase();
-        const name = (d.name ?? '').toLowerCase();
-        const services = (d.services ?? []).map((s) => s.toLowerCase());
-        const specialties = (d.specialties ?? []).map((s) => s.toLowerCase());
-        const certifications = (d.certifications ?? []).map((c) => c.toLowerCase());
-
-        return (
-          businessName.includes(q) ||
-          bio.includes(q) ||
-          loc.includes(q) ||
-          name.includes(q) ||
-          services.some((s) => s.includes(q)) ||
-          specialties.some((s) => s.includes(q)) ||
-          certifications.some((c) => c.includes(q))
-        );
-      });
-    }
-
-    // Price filter
+    // Search and service filter done via API; price filter applied server-side when filters are lifted
+    // Apply price filter client-side as backup (in case parent doesn't pass filters to API)
     if (priceFilter !== 'all') {
       ranked = ranked.filter((d) => d.priceRange === priceFilter);
     }
 
     return ranked;
-  }, [detailers, location, searchQuery, sortBy, priceFilter, serviceFilter]);
+  }, [detailers, location, sortBy, priceFilter, serviceFilter]);
 
   const services = useMemo(() => {
     const allServices = new Set<string>();
@@ -121,7 +127,7 @@ export function MarketplaceSearchEnhanced({
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <Input
-                placeholder="Search detailers or services..."
+                placeholder="Search by name..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 border-gray-300 focus:ring-2 focus:ring-blue-500"
@@ -154,7 +160,7 @@ export function MarketplaceSearchEnhanced({
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-white z-[100]">
                         <SelectItem value="relevance">Relevance (Recommended)</SelectItem>
                         <SelectItem value="distance">Distance</SelectItem>
                         <SelectItem value="rating">Rating</SelectItem>
@@ -168,7 +174,7 @@ export function MarketplaceSearchEnhanced({
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-white z-[100]">
                         <SelectItem value="all">All Prices</SelectItem>
                         <SelectItem value="$">$ - Budget</SelectItem>
                         <SelectItem value="$$">$$ - Moderate</SelectItem>
@@ -184,7 +190,7 @@ export function MarketplaceSearchEnhanced({
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-white z-[100]">
                         <SelectItem value="all">All Services</SelectItem>
                         {services.map((service) => (
                           <SelectItem key={service} value={service}>
@@ -194,6 +200,20 @@ export function MarketplaceSearchEnhanced({
                       </SelectContent>
                     </Select>
                   </div>
+
+                  <Button
+                    variant="outline"
+                    className="w-full mt-4"
+                    onClick={() => {
+                      setSortBy('relevance');
+                      setPriceFilter('all');
+                      setServiceFilter('all');
+                      toast.success('Filters cleared');
+                    }}
+                  >
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Clear filters
+                  </Button>
                 </div>
               </SheetContent>
             </Sheet>

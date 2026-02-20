@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchClientOrders, subscribeToClientOrders } from '../services/orderService';
-import { updateOrderStatus } from '../services/orderService';
+import { fetchClientOrders, subscribeToClientOrders, updateOrderStatus, clientRejectOrder } from '../services/orderService';
 import type { Order } from '../types';
 
 export interface BookingDisplay {
@@ -86,8 +85,12 @@ export function useClientBookings(clientId: string | undefined) {
     return () => unsub();
   }, [clientId, mergeOrder]);
 
-  const cancelOrder = useCallback(async (orderId: string) => {
-    const updated = await updateOrderStatus(orderId, 'rejected');
+  const cancelOrder = useCallback(async (orderId: string, bookingStatus?: string) => {
+    // Use RPC for requested (pending/countered) to bypass RLS; direct update for accepted/in-progress
+    const useRpc = bookingStatus === 'requested';
+    const updated = useRpc
+      ? await clientRejectOrder(orderId)
+      : await updateOrderStatus(orderId, 'rejected');
     mergeOrder(updated);
   }, [mergeOrder]);
 

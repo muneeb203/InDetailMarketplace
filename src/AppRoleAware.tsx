@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { SignInScreen } from "./components/SignInScreen";
 import { SignUpScreen } from "./components/SignUpScreen";
@@ -30,8 +30,8 @@ import { WebLayout } from "./components/WebLayout";
 import { Toaster } from "./components/ui/sonner";
 import { toast } from "sonner";
 import { Customer, Detailer, Lead, Booking } from "./types";
-import { mockDetailers } from "./data/mockData";
 import { useDetailers } from "./hooks/useDetailers";
+import { useDebounce } from "./hooks/useDebounce";
 import { signUpAuthOnly, createClientProfile, createDealerProfile, signInAndLoadProfile } from "./services/supabaseAuth";
 import { supabase } from "./lib/supabaseClient";
 import { getLeadCost } from "./services/stripeService";
@@ -93,8 +93,24 @@ export default function AppRoleAware() {
   const [proNavParams, setProNavParams] = useState<any>({});
   const [orderModalOpen, setOrderModalOpen] = useState(false);
   
+  // Dealer name search with 300ms debounce
+  const [dealerSearchQuery, setDealerSearchQuery] = useState('');
+  const debouncedDealerSearch = useDebounce(dealerSearchQuery, 300);
+  // Filters for Sort By, Price Range, Service Type
+  const [sortBy, setSortBy] = useState<'relevance' | 'distance' | 'rating'>('relevance');
+  const [priceFilter, setPriceFilter] = useState<string>('all');
+  const [serviceFilter, setServiceFilter] = useState<string>('all');
+  const dealerFilters = useMemo(
+    () => ({
+      businessName: debouncedDealerSearch.trim() || undefined,
+      priceRange: priceFilter !== 'all' ? priceFilter : undefined,
+      service: serviceFilter !== 'all' ? serviceFilter : undefined,
+    }),
+    [debouncedDealerSearch, priceFilter, serviceFilter]
+  );
+
   // Fetch real detailers from Supabase
-  const { detailers, loading: detailersLoading, error: detailersError } = useDetailers();
+  const { detailers, loading: detailersLoading, error: detailersError } = useDetailers(dealerFilters);
   const { data: dealerProfile } = useDealerProfile(
     currentUser?.role === 'detailer' ? currentUser.id : undefined
   );
@@ -109,16 +125,7 @@ export default function AppRoleAware() {
   console.log('⏳ Loading:', detailersLoading);
   console.log('❌ Error:', detailersError);
   
-  // Fallback to mock data if Supabase fails or is empty
-  const displayDetailers = detailers.length > 0 ? detailers : mockDetailers;
-  console.log('🎯 Displaying:', displayDetailers.length, 'detailers', displayDetailers.length === detailers.length ? '(from Supabase)' : '(from mock data)');
-  
-  // Show a toast notification about data source
-  if (detailers.length > 0 && currentView === 'marketplace') {
-    console.log('✅ Using REAL data from Supabase!');
-  } else if (currentView === 'marketplace') {
-    console.log('⚠️ Using MOCK data (Supabase returned 0 detailers)');
-  }
+  const displayDetailers = detailers;
   
   // Mock leads and bookings for demo
   const [mockLeads, setMockLeads] = useState<Lead[]>([
@@ -703,6 +710,14 @@ export default function AppRoleAware() {
           <>
             <MarketplaceSearchEnhanced
               detailers={displayDetailers}
+              searchQuery={dealerSearchQuery}
+              onSearchChange={setDealerSearchQuery}
+              sortBy={sortBy}
+              onSortByChange={setSortBy}
+              priceFilter={priceFilter}
+              onPriceFilterChange={setPriceFilter}
+              serviceFilter={serviceFilter}
+              onServiceFilterChange={setServiceFilter}
               onSelectDetailer={(detailer) => {
                 setSelectedDetailerId(detailer.id);
                 setCurrentView("detailer-profile");

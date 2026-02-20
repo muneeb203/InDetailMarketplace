@@ -2,6 +2,10 @@ import { supabase } from '../lib/supabaseClient';
 import { Detailer } from '../types';
 
 export interface DetailerFilters {
+  /** Case-insensitive partial match on dealer_profiles.business_name */
+  businessName?: string;
+  /** Single service for filter (e.g. "Full Detail") - filters via services_offered.specialties */
+  service?: string;
   services?: string[];
   priceRange?: string;
   minRating?: number;
@@ -25,14 +29,26 @@ export async function fetchDetailers(filters?: DetailerFilters): Promise<Detaile
       .from('dealer_profiles')
       .select('*');
 
+    // Dealer name search: case-insensitive partial match (ilike)
+    if (filters?.businessName?.trim()) {
+      query = query.ilike('business_name', `%${filters.businessName.trim()}%`);
+    }
+
     // Apply filters
     if (filters?.priceRange) {
       query = query.eq('price_range', filters.priceRange);
     }
 
+    // Service filter: dealer must offer this service (JSONB array contains)
+    if (filters?.service?.trim()) {
+      query = query.contains('services_offered', { specialties: [filters.service.trim()] });
+    }
+
     if (filters?.isPro !== undefined) {
       query = query.eq('is_pro', filters.isPro);
     }
+
+    query = query.order('rating', { ascending: false });
 
     const { data: dealerData, error: dealerError } = await query;
 
@@ -72,6 +88,7 @@ export async function fetchDetailers(filters?: DetailerFilters): Promise<Detaile
 
       const servicesOffered = dealer.services_offered || {};
       
+      const hasCoords = typeof dealer.location_lat === 'number' && typeof dealer.location_lng === 'number';
       return {
         id: profile.id,
         role: 'detailer',
@@ -83,6 +100,9 @@ export async function fetchDetailers(filters?: DetailerFilters): Promise<Detaile
         logo: dealer.logo_url || undefined,
         avatar: profile.avatar_url || dealer.logo_url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80',
         location: dealer.base_location || 'Unknown',
+        ...(hasCoords && {
+          coordinates: { lat: dealer.location_lat, lng: dealer.location_lng },
+        }),
         serviceRadius: dealer.service_radius_miles ?? servicesOffered.serviceRadius ?? 15,
         priceRange: dealer.price_range || '$$',
         rating: dealer.rating || 4.5,
