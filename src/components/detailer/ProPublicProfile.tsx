@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Play, Star, Instagram, Facebook } from 'lucide-react';
+import { ArrowLeft, Play, Star, Instagram, Facebook, Mail } from 'lucide-react';
 import { BrandHeader } from './BrandHeader';
 import { BeforeAfterCarousel } from './BeforeAfterCarousel';
 import { GalleryLightbox } from './GalleryLightbox';
@@ -8,6 +8,7 @@ import { useDealerProfile } from '../../hooks/useDealerProfile';
 import { fetchDealerSocialLinks, type SocialPlatform } from '../../services/dealerSocialService';
 import { getDealerCompletedOrdersCount } from '../../services/orderService';
 import { fetchDealerReviews, fetchDealerRating } from '../../services/dealerReviewService';
+import type { Detailer } from '../../types';
 
 // Helper to get navigation functions (works with or without react-router)
 function useNav() {
@@ -25,13 +26,20 @@ function useNav() {
 
 interface ProPublicProfileProps {
   onNavigate?: (view: string, params?: any) => void;
+  /** When provided (client viewing a gig), use this detailer's data and show client CTAs */
+  detailer?: Detailer;
+  onBack?: () => void;
+  onRequestQuote?: () => void;
+  onMessage?: () => void;
 }
 
-export function ProPublicProfile({ onNavigate }: ProPublicProfileProps = {}) {
+export function ProPublicProfile({ onNavigate, detailer: detailerProp, onBack, onRequestQuote, onMessage }: ProPublicProfileProps = {}) {
   const navigate = useNav();
   const { currentUser } = useAuth();
+  const isClientView = !!detailerProp;
+  const dealerId = isClientView ? detailerProp!.id : (currentUser?.role === 'detailer' ? currentUser.id : undefined);
   const { data: dealerProfile } = useDealerProfile(
-    currentUser?.role === 'detailer' ? currentUser.id : undefined
+    !isClientView && currentUser?.role === 'detailer' ? currentUser.id : undefined
   );
   const [showGallery, setShowGallery] = useState(false);
   const [socialLinks, setSocialLinks] = useState<{ platform: SocialPlatform; url: string }[]>([]);
@@ -40,59 +48,97 @@ export function ProPublicProfile({ onNavigate }: ProPublicProfileProps = {}) {
   const [dealerRating, setDealerRating] = useState<{ rating: number; review_count: number } | null>(null);
 
   useEffect(() => {
-    if (currentUser?.role === 'detailer' && currentUser.id) {
-      fetchDealerSocialLinks(currentUser.id)
+    if (dealerId) {
+      fetchDealerSocialLinks(dealerId)
         .then((rows) => setSocialLinks(rows.map((r) => ({ platform: r.platform, url: r.url }))))
         .catch(() => setSocialLinks([]));
     }
-  }, [currentUser?.id, currentUser?.role]);
+  }, [dealerId]);
 
   useEffect(() => {
-    if (currentUser?.role === 'detailer' && currentUser.id) {
-      getDealerCompletedOrdersCount(currentUser.id).then(setCompletedJobs);
+    if (dealerId && !isClientView) {
+      getDealerCompletedOrdersCount(dealerId).then(setCompletedJobs);
+    } else if (detailerProp) {
+      setCompletedJobs(detailerProp.completedJobs ?? 0);
     }
-  }, [currentUser?.id, currentUser?.role]);
+  }, [dealerId, isClientView, detailerProp]);
 
   useEffect(() => {
-    if (currentUser?.role === 'detailer' && currentUser.id) {
-      fetchDealerReviews(currentUser.id).then(setReviews).catch(() => setReviews([]));
-      fetchDealerRating(currentUser.id).then(setDealerRating).catch(() => setDealerRating(null));
+    if (dealerId) {
+      fetchDealerReviews(dealerId).then(setReviews).catch(() => setReviews([]));
+      fetchDealerRating(dealerId).then(setDealerRating).catch(() => setDealerRating(null));
     }
-  }, [currentUser?.id, currentUser?.role]);
+  }, [dealerId]);
   
   const handleBack = () => {
-    if (onNavigate) {
+    if (isClientView && onBack) {
+      onBack();
+    } else if (onNavigate) {
       onNavigate('settings');
     } else {
       navigate(-1);
     }
   };
 
-  const serviceRadius = dealerProfile?.service_radius_miles ?? (dealerProfile?.services_offered as { serviceRadius?: number })?.serviceRadius ?? 10;
-  const dealerServices = (dealerProfile?.services_offered as { specialties?: string[] })?.specialties ?? [];
+  const serviceRadius = isClientView
+    ? (detailerProp!.serviceRadius ?? 10)
+    : (dealerProfile?.service_radius_miles ?? (dealerProfile?.services_offered as { serviceRadius?: number })?.serviceRadius ?? 10);
+  const dealerServices = isClientView
+    ? (detailerProp!.services ?? detailerProp!.specialties ?? [])
+    : ((dealerProfile?.services_offered as { specialties?: string[] })?.specialties ?? []);
 
-  // Use real dealer profile when available, fallback to mock
-  const detailer = {
+  // Build BrandHeader-compatible object
+  const detailer = isClientView ? {
+    logo: detailerProp!.logo ?? detailerProp!.avatar,
+    shopName: detailerProp!.businessName ?? 'Detailer',
+    tagline: detailerProp!.tagline ?? 'Perfection in every detail',
+    city: detailerProp!.location ?? 'Set your location',
+    radiusBadge: `${serviceRadius} mi radius`,
+    serviceTags: dealerServices,
+    badges: { verified: !!detailerProp!.isVerified, insured: !!detailerProp!.isInsured },
+    rating: dealerRating?.rating ?? detailerProp!.rating ?? 0,
+    jobCount: completedJobs,
+  } : {
     logo: dealerProfile?.logo_url ?? undefined,
     shopName: dealerProfile?.business_name ?? 'Elite Auto Detailing',
     tagline: 'Perfection in every detail',
     city: dealerProfile?.base_location ?? 'Set your location',
     radiusBadge: `${serviceRadius} mi radius`,
     serviceTags: dealerServices,
-    badges: {
-      verified: true,
-      insured: true,
-    },
+    badges: { verified: true, insured: true },
     rating: dealerRating?.rating ?? 0,
     jobCount: completedJobs,
   };
 
-  const portfolioItems = [
-    { id: '1', before: '', after: '', caption: 'Complete Exterior Detail - Black Tesla Model S', tags: ['black paint', 'ceramic coating', 'luxury'] },
-    { id: '2', before: '', after: '', caption: 'Interior Deep Clean - Pet Hair Removal', tags: ['pet hair', 'interior', 'odor removal'] },
-    { id: '3', before: '', after: '', caption: 'Paint Correction - Swirl Removal', tags: ['paint correction', 'luxury', 'porsche'] },
-    { id: '4', before: '', after: '', caption: 'Headlight Restoration', tags: ['headlight restore'] },
-  ];
+  const portfolioItems = isClientView && detailerProp!.beforeAfterPhotos?.length
+    ? detailerProp!.beforeAfterPhotos.map((p, i) => ({
+        id: p.id ?? String(i),
+        before: p.beforeUrl,
+        after: p.afterUrl,
+        caption: p.description ?? p.category ?? '',
+        tags: p.category ? [p.category] : [],
+      }))
+    : (isClientView && (detailerProp!.photos?.length || detailerProp!.portfolioImages?.length))
+    ? ((detailerProp!.photos?.length ? detailerProp!.photos : detailerProp!.portfolioImages?.map((p) => p.url) ?? [])).map((url, i) => ({
+        id: String(i),
+        before: url,
+        after: url,
+        caption: 'Portfolio',
+        tags: [] as string[],
+      }))
+    : (dealerProfile?.portfolio_images?.length
+        ? dealerProfile.portfolio_images.map((url, i) => ({
+            id: String(i),
+            before: url,
+            after: url,
+            caption: 'Portfolio',
+            tags: [] as string[],
+          }))
+        : []);
+
+  const bioContent = isClientView ? detailerProp!.bio : undefined;
+  const yearsInBusiness = isClientView ? detailerProp!.yearsInBusiness : undefined;
+  const certifications = isClientView ? detailerProp!.certifications : undefined;
 
   const services = dealerServices.length > 0
     ? dealerServices.map((name) => ({ name, price: 'Custom', time: '—' }))
@@ -128,8 +174,8 @@ export function ProPublicProfile({ onNavigate }: ProPublicProfileProps = {}) {
             <ArrowLeft className="w-5 h-5 text-gray-700" />
           </button>
           <div>
-            <h1 className="font-semibold text-gray-900">Public Profile Preview</h1>
-            <p className="text-xs text-gray-600">This is how customers see your profile</p>
+            <h1 className="font-semibold text-gray-900">{isClientView ? 'Detailer Profile' : 'Public Profile Preview'}</h1>
+            <p className="text-xs text-gray-600">{isClientView ? 'View gig details' : 'This is how customers see your profile'}</p>
           </div>
         </div>
       </div>
@@ -252,19 +298,19 @@ export function ProPublicProfile({ onNavigate }: ProPublicProfileProps = {}) {
           </div>
         </div>
 
-        {/* Brand Story / Our Story - from dealer_profiles.bio */}
+        {/* Brand Story / Our Story - from dealer_profiles.bio or detailer */}
         <div className="bg-white rounded-2xl shadow-sm border p-6">
           <h3 className="font-semibold text-lg text-gray-900 mb-4">Our Story</h3>
           <div className="space-y-4 text-gray-700">
-            {dealerProfile?.bio ? (
-              <p className="whitespace-pre-line">{dealerProfile.bio}</p>
+            {(isClientView ? bioContent : dealerProfile?.bio) ? (
+              <p className="whitespace-pre-line">{isClientView ? bioContent : dealerProfile?.bio}</p>
             ) : (
-              <p className="text-gray-500 italic">Add your bio in Settings → Profile to tell customers about your business.</p>
+              <p className="text-gray-500 italic">{isClientView ? 'No bio provided.' : 'Add your bio in Settings → Profile to tell customers about your business.'}</p>
             )}
             <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-              {dealerProfile?.years_in_business != null && dealerProfile.years_in_business > 0 && (
+              {((isClientView ? yearsInBusiness : dealerProfile?.years_in_business) != null && (isClientView ? yearsInBusiness : dealerProfile?.years_in_business)! > 0) && (
                 <div>
-                  <div className="text-2xl font-bold text-blue-600 mb-1">{dealerProfile.years_in_business}+</div>
+                  <div className="text-2xl font-bold text-blue-600 mb-1">{(isClientView ? yearsInBusiness : dealerProfile?.years_in_business)}+</div>
                   <div className="text-sm text-gray-600">Years Experience</div>
                 </div>
               )}
@@ -273,10 +319,10 @@ export function ProPublicProfile({ onNavigate }: ProPublicProfileProps = {}) {
                 <div className="text-sm text-gray-600">Jobs Completed</div>
               </div>
             </div>
-            {dealerProfile?.certifications && dealerProfile.certifications.length > 0 && (
+            {((isClientView ? certifications : dealerProfile?.certifications)?.length ?? 0) > 0 && (
               <div className="pt-4 border-t">
                 <div className="font-medium text-gray-900 mb-2">Certifications</div>
-                <p className="text-sm">{dealerProfile.certifications.join(', ')}</p>
+                <p className="text-sm">{(isClientView ? certifications : dealerProfile?.certifications)!.join(', ')}</p>
               </div>
             )}
           </div>
@@ -284,15 +330,33 @@ export function ProPublicProfile({ onNavigate }: ProPublicProfileProps = {}) {
       </div>
       </div>
 
-      {/* Sticky Request Quote Button */}
+      {/* Sticky CTA Buttons */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 shadow-lg">
-        <div className="max-w-2xl mx-auto">
-          <button
-            onClick={() => navigate('/client/request-quote')}
-            className="w-full h-14 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-lg hover:from-blue-700 hover:to-blue-800 transition-all active:scale-95 shadow-lg"
-          >
-            Request Quote
-          </button>
+        <div className="max-w-2xl mx-auto flex gap-3">
+          {isClientView && onRequestQuote && onMessage ? (
+            <>
+              <button
+                onClick={onRequestQuote}
+                className="flex-1 h-14 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-lg hover:from-blue-700 hover:to-blue-800 transition-all active:scale-95 shadow-lg"
+              >
+                Request Quote
+              </button>
+              <button
+                onClick={onMessage}
+                className="flex-shrink-0 h-14 px-6 rounded-xl border-2 border-blue-600 text-blue-600 font-bold hover:bg-blue-50 transition-all active:scale-95 flex items-center gap-2"
+              >
+                <Mail className="w-5 h-5" />
+                Message
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => navigate('/client/request-quote')}
+              className="w-full h-14 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-lg hover:from-blue-700 hover:to-blue-800 transition-all active:scale-95 shadow-lg"
+            >
+              Request Quote
+            </button>
+          )}
         </div>
       </div>
 

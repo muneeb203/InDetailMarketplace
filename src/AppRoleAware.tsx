@@ -17,7 +17,6 @@ import { DetailerJobStatusPage } from "./components/DetailerJobStatusPage";
 import { StatusCenter } from "./components/StatusCenter";
 import { BookingRequestForm } from "./components/BookingRequestForm";
 import { DetailerProfile } from "./components/DetailerProfile";
-import { DetailerProfileEnhancedPublic } from "./components/DetailerProfileEnhancedPublic";
 import { OrderPlacementModal } from "./components/OrderPlacementModal";
 import { ClientOrdersPage } from "./components/ClientOrdersPage";
 import { ProDashboard } from "./components/detailer/ProDashboard";
@@ -911,9 +910,9 @@ export default function AppRoleAware() {
         </div>
       )}
 
-      {/* Detailer Profile (Public - Enhanced) */}
+      {/* Detailer Profile (Public - same layout as dealer View Gig) */}
       {currentView === "detailer-profile" && selectedDetailerId && (
-        <DetailerProfileEnhancedPublic
+        <ProPublicProfile
           detailer={displayDetailers.find(d => d.id === selectedDetailerId) || displayDetailers[0]}
           onBack={() => setCurrentView("marketplace")}
           onRequestQuote={() => {

@@ -38,13 +38,7 @@ export function BeforeAfterCarousel({
           <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
             <span className="text-3xl">📸</span>
           </div>
-          <h3 className="font-semibold text-gray-900 mb-2">No portfolio photos yet</h3>
-          <p className="text-gray-600 text-sm mb-4">
-            Showcase your best work with before & after photos
-          </p>
-          <button className="px-6 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors">
-            Add Photos
-          </button>
+          <h3 className="font-semibold text-gray-900">No portfolio photos yet</h3>
         </div>
       </div>
     );
@@ -56,7 +50,7 @@ export function BeforeAfterCarousel({
     <div className={cn("bg-white rounded-2xl shadow-sm border overflow-hidden", className)}>
       <div className="p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-lg text-gray-900">Before & After</h3>
+          <h3 className="font-semibold text-lg text-gray-900">Portfolio</h3>
           <button
             onClick={onViewGallery}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors font-medium"
@@ -66,28 +60,20 @@ export function BeforeAfterCarousel({
           </button>
         </div>
 
-        {/* Carousel */}
+        {/* Carousel - single portfolio image per slide */}
         <div className="relative">
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            {/* Before */}
-            <div className="space-y-2">
-              <div className="text-xs font-medium text-gray-600 uppercase tracking-wide">Before</div>
-              <div className="aspect-[4/3] rounded-xl overflow-hidden bg-gray-100">
-                <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
-                  <span className="text-6xl opacity-30">🚗</span>
-                </div>
+          <div className="aspect-[4/3] rounded-xl overflow-hidden bg-gray-100 mb-4">
+            {(currentItem.after || currentItem.before) ? (
+              <img
+                src={currentItem.after || currentItem.before}
+                alt={currentItem.caption || 'Portfolio'}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
+                <span className="text-6xl opacity-30">📸</span>
               </div>
-            </div>
-
-            {/* After */}
-            <div className="space-y-2">
-              <div className="text-xs font-medium text-green-600 uppercase tracking-wide">After</div>
-              <div className="aspect-[4/3] rounded-xl overflow-hidden bg-gray-100">
-                <div className="w-full h-full bg-gradient-to-br from-blue-100 via-indigo-100 to-blue-200 flex items-center justify-center">
-                  <span className="text-6xl opacity-40">✨</span>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Caption & Tags */}
