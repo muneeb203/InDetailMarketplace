@@ -187,7 +187,7 @@ export function SignUpScreen({
                 }}
                 onBlur={() => handleBlur('name')}
                 placeholder="John Doe"
-                className={`h-11 ${
+                className={`h-11 border-[#0078FF]/50 bg-white ${
                   touched.name && errors.name
                     ? 'border-red-500 focus-visible:ring-red-500'
                     : 'focus-visible:ring-[#0078FF] focus-visible:border-[#0078FF]'
@@ -222,7 +222,7 @@ export function SignUpScreen({
                 }}
                 onBlur={() => handleBlur('email')}
                 placeholder="you@example.com"
-                className={`h-11 ${
+                className={`h-11 border-[#0078FF]/50 bg-white ${
                   touched.email && errors.email
                     ? 'border-red-500 focus-visible:ring-red-500'
                     : 'focus-visible:ring-[#0078FF] focus-visible:border-[#0078FF]'
@@ -257,7 +257,7 @@ export function SignUpScreen({
                 }}
                 onBlur={() => handleBlur('phone')}
                 placeholder="(555) 123-4567"
-                className={`h-11 ${
+                className={`h-11 border-[#0078FF]/50 bg-white ${
                   touched.phone && errors.phone
                     ? 'border-red-500 focus-visible:ring-red-500'
                     : 'focus-visible:ring-[#0078FF] focus-visible:border-[#0078FF]'
@@ -293,7 +293,7 @@ export function SignUpScreen({
                   }}
                   onBlur={() => handleBlur('password')}
                   placeholder="Minimum 8 characters"
-                  className={`h-11 pr-10 ${
+                  className={`h-11 pr-10 border-[#0078FF]/50 bg-white ${
                     touched.password && errors.password
                       ? 'border-red-500 focus-visible:ring-red-500'
                       : 'focus-visible:ring-[#0078FF] focus-visible:border-[#0078FF]'
@@ -340,7 +340,7 @@ export function SignUpScreen({
                 }}
                 onBlur={() => handleBlur('confirmPassword')}
                 placeholder="Re-enter your password"
-                className={`h-11 ${
+                className={`h-11 border-[#0078FF]/50 bg-white ${
                   touched.confirmPassword && errors.confirmPassword
                     ? 'border-red-500 focus-visible:ring-red-500'
                     : 'focus-visible:ring-[#0078FF] focus-visible:border-[#0078FF]'
@@ -384,10 +384,10 @@ export function SignUpScreen({
             >
               <Button
                 type="submit"
-                className={`w-full h-12 font-semibold transition-colors duration-200 ${
+                className={`w-full h-12 font-semibold ${
                   isSuccess
                     ? '!bg-green-600 hover:!bg-green-600 disabled:!bg-green-600'
-                    : '!bg-[#0078FF] hover:!bg-[#0056CC] active:!bg-[#0047A3] disabled:!bg-gray-400 disabled:!text-gray-600'
+                    : '!bg-[#0078FF] hover:!bg-[#0078FF] active:!bg-[#0078FF] disabled:!bg-[#0078FF] disabled:hover:!bg-[#0078FF] disabled:!text-white'
                 } text-white shadow-md ${
                   isValid && !isLoading && !isSuccess
                     ? 'shadow-blue-200/50'
