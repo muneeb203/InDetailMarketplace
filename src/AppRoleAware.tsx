@@ -26,10 +26,12 @@ import { DealerOrdersQueue } from "./components/detailer/DealerOrdersQueue";
 import { DealerSettings } from "./components/detailer/DealerSettings/DealerSettings";
 import { ClientSettings } from "./components/ClientSettings";
 import { DetailerProfileHome } from "./components/detailer/DetailerProfileHome";
+import { TermsOfService } from "./components/TermsOfService";
+import { PrivacyPolicy } from "./components/PrivacyPolicy";
 import { WebLayout } from "./components/WebLayout";
 import { Toaster } from "./components/ui/sonner";
 import { toast } from "sonner";
-import { Customer, Detailer, Lead, Booking } from "./types";
+import { Customer, Detailer, Lead } from "./types";
 import { useDetailers } from "./hooks/useDetailers";
 import { useDebounce } from "./hooks/useDebounce";
 import { signUpAuthOnly, createClientProfile, createDealerProfile, signInAndLoadProfile } from "./services/supabaseAuth";
@@ -66,7 +68,9 @@ type View =
   | "orders-queue"
   | "quotes"
   | "alerts"
-  | "settings";
+  | "settings"
+  | "terms"
+  | "privacy";
 
 type AuthFlow = "signin" | "signup";
 
@@ -127,7 +131,7 @@ export default function AppRoleAware() {
   
   const displayDetailers = detailers;
   
-  // Mock leads and bookings for demo
+  // Mock leads for demo (TODO: Replace with real leads from database)
   const [mockLeads, setMockLeads] = useState<Lead[]>([
     {
       id: 'lead-1',
@@ -138,37 +142,6 @@ export default function AppRoleAware() {
       cost: getLeadCost(false, false),
       sentAt: new Date(),
     }
-  ]);
-  
-  const [mockBookings, setMockBookings] = useState<Booking[]>([
-    {
-      id: 'booking-1',
-      requestId: 'req-2',
-      customerId: 'c1',
-      detailerId: 'd1',
-      services: ['Full Detail', 'Ceramic Coating'],
-      vehicleType: '2022 Tesla Model 3',
-      location: 'Downtown',
-      scheduledDate: 'Dec 28, 2024',
-      scheduledTime: '10:00 AM',
-      price: 299,
-      status: 'confirmed',
-      createdAt: new Date(),
-    },
-    {
-      id: 'booking-2',
-      requestId: 'req-3',
-      customerId: 'c2',
-      detailerId: 'd1',
-      services: ['Exterior Wash', 'Interior Detail'],
-      vehicleType: '2021 BMW X5',
-      location: 'Midtown',
-      scheduledDate: 'Dec 30, 2024',
-      scheduledTime: '2:00 PM',
-      price: 180,
-      status: 'on-the-way',
-      createdAt: new Date(),
-    },
   ]);
 
   // Handle role selection from welcome screen (Continue button clicked)
@@ -191,79 +164,104 @@ export default function AppRoleAware() {
 
   // Handle sign in
   const handleSignIn = async (
-    email: string,
-    password: string,
-    _role: "client" | "detailer",
-  ) => {
-    try {
-      const result = await signInAndLoadProfile(email, password);
+      email: string,
+      password: string,
+      selectedRole: "client" | "detailer",
+    ) => {
+      try {
+        const result = await signInAndLoadProfile(email, password);
 
-      if (result.appRole === "client") {
-        const clientUser: Customer & { role: "client" } = {
-          id: result.profile.id,
-          role: "client",
-          email: result.profile.email,
-          phone: result.profile.phone ?? "",
-          name: result.profile.name,
-          location: result.clientProfile?.base_location ?? "Unknown",
-          createdAt: new Date(result.profile.created_at ?? new Date()),
-          vehicles: result.clientProfile?.vehicle_make
-            ? [
-                {
-                  id: "1",
-                  make: result.clientProfile.vehicle_make,
-                  model: result.clientProfile.vehicle_model ?? "",
-                  year: result.clientProfile.vehicle_year ?? new Date().getFullYear(),
-                  type: "Sedan",
-                  isDefault: true,
-                },
-              ]
-            : [],
-        };
-        setCurrentUser(clientUser);
-        setCurrentView("marketplace");
-        toast.success("Signed in as client");
-      } else if (result.appRole === "detailer") {
-        const dealer = result.dealerProfile;
-        const detailerUser: Detailer & { role: "detailer" } = {
-          id: result.profile.id,
-          role: "detailer",
-          email: result.profile.email,
-          phone: result.profile.phone ?? "",
-          name: result.profile.name,
-          businessName: dealer?.business_name ?? "My Detailing Business",
-          bio: `Welcome to ${dealer?.business_name ?? "our detailing business"}! We offer premium auto detailing services.`,
-          avatar:
-            result.profile.avatar_url ??
-            "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80",
-          location: dealer?.base_location ?? "Unknown",
-          serviceRadius:
-            (dealer?.services_offered as any)?.serviceRadius ?? 15,
-          priceRange: dealer?.price_range ?? "$$",
-          rating: 0,
-          photos: [],
-          services:
-            ((dealer?.services_offered as any)?.specialties as string[]) ?? [],
-          specialties:
-            ((dealer?.services_offered as any)?.specialties as string[]) ?? [],
-          isPro: false,
-          wallet: 0,
-          completedJobs: 0,
-          createdAt: new Date(result.profile.created_at ?? new Date()),
-        };
-        setCurrentUser(detailerUser);
-        setCurrentView("pro-dashboard");
-        toast.success("Signed in as detailer");
-      } else {
-        toast.error("Unsupported role");
+        // Validate that the selected role matches the actual user role in database
+        const actualRole = result.appRole === "admin" ? "detailer" : result.appRole;
+
+        if (selectedRole !== actualRole) {
+          // Role mismatch - user selected wrong role
+          const roleNames = {
+            client: "Client",
+            detailer: "Detailer"
+          };
+
+          toast.error("Role Mismatch", {
+            description: `This account is registered as a ${roleNames[actualRole]}. Please go back and select the correct role, or sign up for a new ${roleNames[selectedRole]} account.`,
+            duration: 6000,
+          });
+          throw new Error("Role mismatch");
+        }
+
+        if (result.appRole === "client") {
+          const clientUser: Customer & { role: "client" } = {
+            id: result.profile.id,
+            role: "client",
+            email: result.profile.email,
+            phone: result.profile.phone ?? "",
+            name: result.profile.name,
+            location: result.clientProfile?.base_location ?? "Unknown",
+            createdAt: new Date(result.profile.created_at ?? new Date()),
+            vehicles: result.clientProfile?.vehicle_make
+              ? [
+                  {
+                    id: "1",
+                    make: result.clientProfile.vehicle_make,
+                    model: result.clientProfile.vehicle_model ?? "",
+                    year: result.clientProfile.vehicle_year ?? new Date().getFullYear(),
+                    type: "Sedan",
+                    isDefault: true,
+                  },
+                ]
+              : [],
+          };
+          setCurrentUser(clientUser);
+          setCurrentView("marketplace");
+          toast.success("Signed in as client");
+        } else if (result.appRole === "detailer") {
+          const dealer = result.dealerProfile;
+          
+          // Fetch completed jobs count from orders table
+          const { count: completedJobsCount } = await supabase
+            .from('orders')
+            .select('*', { count: 'exact', head: true })
+            .eq('dealer_id', result.profile.id)
+            .eq('status', 'completed');
+          
+          const detailerUser: Detailer & { role: "detailer" } = {
+            id: result.profile.id,
+            role: "detailer",
+            email: result.profile.email,
+            phone: result.profile.phone ?? "",
+            name: result.profile.name,
+            businessName: dealer?.business_name ?? "My Detailing Business",
+            bio: `Welcome to ${dealer?.business_name ?? "our detailing business"}! We offer premium auto detailing services.`,
+            avatar:
+              result.profile.avatar_url ??
+              "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80",
+            location: dealer?.base_location ?? "Unknown",
+            serviceRadius:
+              (dealer?.services_offered as any)?.serviceRadius ?? 15,
+            priceRange: dealer?.price_range ?? "$",
+            rating: Number(dealer?.rating ?? 0), // Use real rating from database
+            photos: [],
+            services:
+              ((dealer?.services_offered as any)?.specialties as string[]) ?? [],
+            specialties:
+              ((dealer?.services_offered as any)?.specialties as string[]) ?? [],
+            isPro: false,
+            wallet: 0,
+            completedJobs: completedJobsCount ?? 0, // Use real count from orders
+            createdAt: new Date(result.profile.created_at ?? new Date()),
+          };
+          setCurrentUser(detailerUser);
+          setCurrentView("pro-dashboard");
+          toast.success("Signed in as detailer");
+        } else {
+          toast.error("Unsupported role");
+        }
+      } catch (error: any) {
+        toast.error("Sign-in failed", {
+          description: error?.message ?? "Please check your credentials.",
+        });
+        throw error;
       }
-    } catch (error: any) {
-      toast.error("Sign-in failed", {
-        description: error?.message ?? "Please check your credentials.",
-      });
-      throw error;
     }
-  };
 
   // Handle sign up
   const handleSignUp = async (data: {
@@ -286,11 +284,14 @@ export default function AppRoleAware() {
 
       toast.success("Account created successfully!");
 
-      if (data.role === "client") {
-        setCurrentView("onboarding-client");
-      } else {
-        setCurrentView("onboarding-detailer");
-      }
+      // Delay navigation to allow success animation to show
+      setTimeout(() => {
+        if (data.role === "client") {
+          setCurrentView("onboarding-client");
+        } else {
+          setCurrentView("onboarding-detailer");
+        }
+      }, 1500); // 1.5 second delay for success animation
     } catch (error: any) {
       toast.error("Sign-up failed", {
         description: error?.message ?? "Please try again.",
@@ -526,12 +527,6 @@ export default function AppRoleAware() {
     });
   };
   
-  // Handle view booking
-  const handleViewBooking = (booking: Booking) => {
-    setSelectedBookingId(booking.id);
-    setCurrentView('job-status');
-  };
-
   // Handle navigation
   const handleNavigate = (view: string) => {
     if (view !== "messages") setViewingConversationId(null);
@@ -615,7 +610,31 @@ export default function AppRoleAware() {
     return (
       <>
         <Toaster position="top-center" richColors />
-        <WelcomeScreen onContinue={handleContinueFromWelcome} />
+        <WelcomeScreen 
+          onContinue={handleContinueFromWelcome}
+          onViewTerms={() => setCurrentView("terms")}
+          onViewPrivacy={() => setCurrentView("privacy")}
+        />
+      </>
+    );
+  }
+
+  // Terms of Service
+  if (currentView === "terms") {
+    return (
+      <>
+        <Toaster position="top-center" richColors />
+        <TermsOfService onBack={handleBackToWelcome} />
+      </>
+    );
+  }
+
+  // Privacy Policy
+  if (currentView === "privacy") {
+    return (
+      <>
+        <Toaster position="top-center" richColors />
+        <PrivacyPolicy onBack={handleBackToWelcome} />
       </>
     );
   }
@@ -744,11 +763,9 @@ export default function AppRoleAware() {
           <DetailerDashboardEnhanced
             detailer={currentUser as Detailer}
             leads={mockLeads}
-            bookings={mockBookings}
             onAcceptLead={handleAcceptLead}
             onDeclineLead={handleDeclineLead}
             onUpgradeToPro={handleUpgradeToPro}
-            onViewBooking={handleViewBooking}
             onCreditsAdded={handleAddCredits}
             onNavigateToDemo={() =>
               setCurrentView("status-demo")

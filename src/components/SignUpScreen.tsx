@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card } from './ui/card';
@@ -96,7 +96,16 @@ export function SignUpScreen({
     try {
       setIsLoading(true);
       await onSignUp({ name, email, phone, password, role });
+      
+      // Show success state briefly before parent navigates
       setIsSuccess(true);
+      
+      // Note: Parent component (AppRoleAware) will handle navigation to onboarding
+      // after the toast success message. The success animation will be visible
+      // during the brief moment before navigation occurs.
+    } catch (error) {
+      // Error handling is done in parent component via toast
+      setIsSuccess(false);
     } finally {
       setIsLoading(false);
     }

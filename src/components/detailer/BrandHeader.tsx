@@ -1,6 +1,7 @@
 import React from 'react';
 import { Star, CheckCircle, Shield, MapPin } from 'lucide-react';
 import { cn } from '../ui/utils';
+import { AvatarWithFallback } from '../ui/avatar-with-fallback';
 
 interface BrandHeaderProps {
   logo?: string;
@@ -35,13 +36,12 @@ export function BrandHeader({
   if (compact) {
     return (
       <div className={cn("flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-xl shadow-sm", className)}>
-        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center overflow-hidden flex-shrink-0">
-          {logo ? (
-            <img src={logo} alt={shopName} className="w-full h-full object-cover" />
-          ) : (
-            <span className="text-white font-bold text-lg">{shopName.charAt(0)}</span>
-          )}
-        </div>
+        <AvatarWithFallback
+          src={logo}
+          name={shopName}
+          size="md"
+          className="rounded-full"
+        />
         <div className="flex-1 min-w-0">
           <h1 className="font-semibold text-gray-900 truncate text-lg">{shopName}</h1>
           {rating != null && (
@@ -61,13 +61,12 @@ export function BrandHeader({
       <div className="h-20 bg-gradient-to-br from-blue-50 via-blue-100/80 to-indigo-100/80" />
       <div className="px-5 pb-5 relative">
         <div className="relative -mt-11 mb-4">
-          <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center overflow-hidden border-4 border-white shadow-md">
-            {logo ? (
-              <img src={logo} alt={shopName} className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-white font-bold text-2xl">{shopName.charAt(0)}</span>
-            )}
-          </div>
+          <AvatarWithFallback
+            src={logo}
+            name={shopName}
+            size="xl"
+            className="border-4 border-white shadow-md"
+          />
         </div>
 
         <div className="space-y-3">

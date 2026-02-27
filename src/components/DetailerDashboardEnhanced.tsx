@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Detailer, Lead, Booking } from '../types';
+import { Detailer, Lead } from '../types';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -14,11 +14,9 @@ import { getLeadCost } from '../services/stripeService';
 interface DetailerDashboardEnhancedProps {
   detailer: Detailer;
   leads: Lead[];
-  bookings?: Booking[];
   onAcceptLead: (leadId: string) => void;
   onDeclineLead: (leadId: string) => void;
   onUpgradeToPro?: () => void;
-  onViewBooking?: (booking: Booking) => void;
   onCreditsAdded?: (credits: number) => void;
   onNavigateToDemo?: () => void;
   onBuyCredits?: () => void;
@@ -27,11 +25,9 @@ interface DetailerDashboardEnhancedProps {
 export function DetailerDashboardEnhanced({
   detailer,
   leads,
-  bookings = [],
   onAcceptLead,
   onDeclineLead,
   onUpgradeToPro,
-  onViewBooking,
   onCreditsAdded,
   onNavigateToDemo,
   onBuyCredits,
@@ -40,12 +36,13 @@ export function DetailerDashboardEnhanced({
   const [showSubscription, setShowSubscription] = useState(false);
 
   const pendingLeads = leads.filter((l) => l.status === 'pending');
-  const activeBookings = bookings.filter((b) =>
-    ['confirmed', 'on-the-way', 'started'].includes(b.status)
-  );
-  const completedBookings = bookings.filter((b) => b.status === 'completed');
+  
+  // Note: Bookings are now handled through the real orders system
+  // See BookingsPageIntegrated and DealerOrdersQueue components
+  const activeBookings: never[] = [];
+  const completedBookings: never[] = [];
 
-  const thisMonthEarnings = completedBookings.reduce((sum, b) => sum + b.price, 0);
+  const thisMonthEarnings = 0; // TODO: Calculate from real completed orders
   const leadCost = getLeadCost(detailer.isPro, false);
   const canAcceptLead = detailer.wallet >= leadCost;
 

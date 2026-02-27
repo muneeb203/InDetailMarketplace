@@ -324,3 +324,162 @@ export function subscribeToAllConversations(
     channels.forEach((ch) => supabase.removeChannel(ch));
   };
 }
+
+/**
+ * Typing indicator: Broadcast typing status to other user in conversation.
+ * Uses Supabase Realtime presence feature.
+ */
+export interface TypingStatus {
+  userId: string;
+  userName: string;
+  isTyping: boolean;
+  timestamp: number;
+}
+
+export function broadcastTypingStatus(
+  conversationId: string,
+  userId: string,
+  userName: string,
+  isTyping: boolean
+): RealtimeChannel {
+  const channel = supabase.channel(`typing-${conversationId}`, {
+    config: { presence: { key: userId } },
+  });
+
+  channel.subscribe(async (status) => {
+    if (status === 'SUBSCRIBED') {
+      await channel.track({
+        userId,
+        userName,
+        isTyping,
+        timestamp: Date.now(),
+      });
+    }
+  });
+
+  return channel;
+}
+
+/**
+ * Subscribe to typing indicators for a conversation.
+ * Returns unsubscribe function.
+ */
+export function subscribeToTypingStatus(
+  conversationId: string,
+  currentUserId: string,
+  onTypingChange: (typingUsers: TypingStatus[]) => void
+): () => void {
+  const channel = supabase.channel(`typing-${conversationId}`, {
+    config: { presence: { key: currentUserId } },
+  });
+
+  channel
+    .on('presence', { event: 'sync' }, () => {
+      const state = channel.presenceState();
+      const typingUsers: TypingStatus[] = [];
+
+      Object.values(state).forEach((presences: any) => {
+        presences.forEach((presence: any) => {
+          if (presence.userId !== currentUserId && presence.isTyping) {
+            typingUsers.push({
+              userId: presence.userId,
+              userName: presence.userName,
+              isTyping: presence.isTyping,
+              timestamp: presence.timestamp,
+            });
+          }
+        });
+      });
+
+      onTypingChange(typingUsers);
+    })
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
+/**
+ * Update message read status by updating conversation's last_read_at timestamp.
+ * This automatically marks all messages before that timestamp as read.
+ */
+export async function updateReadReceipt(
+  conversationId: string,
+  userId: string,
+  role: 'client' | 'detailer'
+): Promise<void> {
+  await markConversationAsRead(conversationId, userId, role);
+}
+
+/**
+ * Get read status for messages in a conversation.
+ * Returns map of message IDs to read status.
+ */
+export async function getMessageReadStatus(
+  conversationId: string,
+  userId: string,
+  role: 'client' | 'detailer'
+): Promise<Map<string, boolean>> {
+  const { data: conv } = await supabase
+    .from('conversations')
+    .select('client_last_read_at, dealer_last_read_at')
+    .eq('id', conversationId)
+    .single();
+
+  if (!conv) return new Map();
+
+  const otherReadCol = role === 'client' ? 'dealer_last_read_at' : 'client_last_read_at';
+  const otherReadAt = conv[otherReadCol];
+
+  if (!otherReadAt) return new Map();
+
+  const { data: messages } = await supabase
+    .from('messages')
+    .select('id, created_at, sender_id')
+    .eq('conversation_id', conversationId)
+    .eq('sender_id', userId);
+
+  const readMap = new Map<string, boolean>();
+  messages?.forEach((msg) => {
+    const isRead = new Date(msg.created_at) <= new Date(otherReadAt);
+    readMap.set(msg.id, isRead);
+  });
+
+  return readMap;
+}
+
+/**
+ * Subscribe to read receipt updates for a conversation.
+ * Fires when the other user reads messages.
+ */
+export function subscribeToReadReceipts(
+  conversationId: string,
+  role: 'client' | 'detailer',
+  onReadUpdate: (lastReadAt: string) => void
+): () => void {
+  const otherReadCol = role === 'client' ? 'dealer_last_read_at' : 'client_last_read_at';
+
+  const channel = supabase
+    .channel(`read-receipts-${conversationId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'conversations',
+        filter: `id=eq.${conversationId}`,
+      },
+      (payload) => {
+        const newReadAt = (payload.new as any)[otherReadCol];
+        if (newReadAt) {
+          onReadUpdate(newReadAt);
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}

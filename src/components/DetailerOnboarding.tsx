@@ -241,7 +241,7 @@ export function DetailerOnboarding({
     if (step === 2) return location.trim().length > 0 && locationLat !== null && locationLng !== null;
     if (step === 3) return selectedSpecialties.length > 0;
     if (step === 4) return priceRange.length > 0;
-    if (step === 5) return !!logoUrl;
+    if (step === 5) return true; // Logo is now optional
     return true;
   };
 

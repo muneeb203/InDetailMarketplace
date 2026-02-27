@@ -299,14 +299,24 @@ function DealerOrderCard({
   };
 
   const handleMarkInProgress = async () => {
-    if (!isAllowedDealerTransition(order.status, 'in_progress')) return;
+    if (!isAllowedDealerTransition(order.status, 'in_progress')) {
+      toast.error(`Cannot transition from ${order.status} to in_progress`);
+      console.error('Transition not allowed:', { from: order.status, to: 'in_progress' });
+      return;
+    }
     setUpdatingId(order.id);
     try {
+      console.log('Updating order to in_progress:', order.id);
       const updated = await updateOrderStatus(order.id, 'in_progress');
+      console.log('Order updated successfully:', updated);
       mergeOrder(updated);
       toast.success('Marked in progress');
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update');
+      console.error('Failed to update order:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update';
+      toast.error(errorMessage, {
+        description: 'Please check console for details'
+      });
     } finally {
       setUpdatingId(null);
     }
