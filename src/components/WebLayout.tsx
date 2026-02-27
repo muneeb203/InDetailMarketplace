@@ -2,6 +2,7 @@ import React, { ReactNode, useState, useEffect } from 'react';
 import { Bell, MessageSquare, Calendar, Activity, FileText, AlertCircle, Home, Settings, LogOut, Package } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { ProfileSidebar } from './ProfileSidebar';
+import { AvatarWithFallback } from './ui/avatar-with-fallback';
 import type { Vehicle } from '../types';
 
 interface WebLayoutProps {
@@ -38,11 +39,6 @@ export function WebLayout({
   unreadMessages = 0,
 }: WebLayoutProps) {
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
-  const [logoError, setLogoError] = useState(false);
-
-  useEffect(() => {
-    setLogoError(false);
-  }, [dealerLogoUrl]);
 
   // Use business name for detailers, personal name for clients
   const displayName = userRole === 'detailer' && businessName ? businessName : userName;
@@ -55,18 +51,11 @@ export function WebLayout({
         <div className="flex items-center gap-8">
           {/* Logo */}
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden bg-blue-600 flex-shrink-0">
-              {userRole === 'detailer' && dealerLogoUrl && !logoError ? (
-                <img
-                  src={dealerLogoUrl}
-                  alt="Logo"
-                  className="w-full h-full object-cover"
-                  onError={() => setLogoError(true)}
-                />
-              ) : (
-                <span className="text-white font-bold text-xl">S</span>
-              )}
-            </div>
+            <AvatarWithFallback
+              src={userRole === 'detailer' ? dealerLogoUrl : undefined}
+              name={displayName}
+              size="sm"
+            />
             <div>
               <p className="font-semibold text-gray-900">{displayName}</p>
               <p className="text-xs text-gray-500">{accountType}</p>

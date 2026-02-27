@@ -32,11 +32,30 @@ export interface CreateOrderInput {
 }
 
 export async function createOrder(input: CreateOrderInput, clientId: string): Promise<Order> {
+  // Verify authentication
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError) {
+    console.error('Auth error in createOrder:', authError);
+    throw new Error('You must be signed in to create an order');
+  }
+  if (!user) {
+    throw new Error('You must be signed in to create an order');
+  }
+
+  // Log for debugging
+  console.log('Creating order:', {
+    authUserId: user.id,
+    passedClientId: clientId,
+    match: user.id === clientId,
+    input,
+  });
+
+  // Use authenticated user ID instead of passed clientId for security
   const { data, error } = await supabase
     .from('orders')
     .insert({
       gig_id: input.gig_id,
-      client_id: clientId,
+      client_id: user.id, // Use auth.uid() equivalent
       dealer_id: input.dealer_id,
       proposed_price: input.proposed_price,
       notes: input.notes || null,
@@ -46,8 +65,29 @@ export async function createOrder(input: CreateOrderInput, clientId: string): Pr
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('Order creation error:', error);
+    throw error;
+  }
   return mapRowToOrder(data);
+}
+
+export async function fetchOrderById(orderId: string): Promise<Order | null> {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('id', orderId)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') return null; // Not found
+    throw error;
+  }
+  
+  const order = mapRowToOrder(data);
+  await enrichOrdersWithDealer([order]);
+  await enrichOrdersWithClient([order]);
+  return order;
 }
 
 export async function fetchClientOrders(clientId: string): Promise<Order[]> {
@@ -163,8 +203,31 @@ export async function updateOrderStatus(
   status: OrderStatus,
   extra?: { agreed_price?: number }
 ): Promise<Order> {
+  console.log('updateOrderStatus called:', { orderId, status, extra });
+  
+  // First, check if we can read the order (to verify RLS permissions)
+  const { data: existingOrder, error: readError } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('id', orderId)
+    .single();
+  
+  if (readError) {
+    console.error('Cannot read order:', readError);
+    throw new Error(`Cannot access order: ${readError.message}. You may not have permission to view this order.`);
+  }
+  
+  if (!existingOrder) {
+    throw new Error('Order not found');
+  }
+  
+  console.log('Current order status:', existingOrder.status);
+  console.log('Current user (dealer_id):', existingOrder.dealer_id);
+  
   const payload: Record<string, unknown> = { status };
   if (extra?.agreed_price != null) payload.agreed_price = extra.agreed_price;
+
+  console.log('Updating order with payload:', payload);
 
   const { data, error } = await supabase
     .from('orders')
@@ -173,8 +236,31 @@ export async function updateOrderStatus(
     .select()
     .single();
 
-  if (error) throw error;
-  return mapRowToOrder(data);
+  if (error) {
+    console.error('Supabase update error:', {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+      fullError: error
+    });
+    
+    // PGRST116 means no rows returned - likely RLS blocking the update
+    if (error.code === 'PGRST116') {
+      throw new Error('Permission denied: You do not have permission to update this order. Please check RLS policies.');
+    }
+    
+    throw new Error(`Failed to update order: ${error.message} (code: ${error.code})`);
+  }
+  
+  if (!data) {
+    throw new Error('Update succeeded but no data returned');
+  }
+  
+  console.log('Order updated successfully, raw data:', data);
+  const order = mapRowToOrder(data);
+  console.log('Mapped order:', order);
+  return order;
 }
 
 /**
@@ -246,6 +332,8 @@ export function subscribeToDealerOrders(
   onInsert: (order: Order) => void,
   onUpdate: (order: Order) => void
 ) {
+  console.log('Setting up dealer orders subscription for dealer:', dealerId);
+  
   const channel = supabase
     .channel(`orders:dealer:${dealerId}`)
     .on(
@@ -257,18 +345,27 @@ export function subscribeToDealerOrders(
         filter: `dealer_id=eq.${dealerId}`,
       },
       async (payload) => {
+        console.log('Dealer orders subscription event:', payload.eventType, payload);
         const order = mapRowToOrder(payload.new as Record<string, unknown>);
         if (payload.eventType === 'INSERT') {
+          console.log('New order inserted:', order);
           onInsert(order);
-          enrichSingleOrderWithClient(order).then((enriched) => enriched && onUpdate(enriched));
+          enrichSingleOrderWithClient(order).then((enriched) => {
+            console.log('Order enriched with client:', enriched);
+            enriched && onUpdate(enriched);
+          });
         } else if (payload.eventType === 'UPDATE') {
+          console.log('Order updated:', order);
           onUpdate(order);
         }
       }
     )
-    .subscribe();
+    .subscribe((status) => {
+      console.log('Dealer orders subscription status:', status);
+    });
 
   return () => {
+    console.log('Unsubscribing from dealer orders');
     supabase.removeChannel(channel);
   };
 }

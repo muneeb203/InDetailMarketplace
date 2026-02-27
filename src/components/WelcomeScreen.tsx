@@ -6,9 +6,11 @@ import { motion, AnimatePresence } from 'motion/react';
 
 interface WelcomeScreenProps {
   onContinue: (role: 'client' | 'detailer') => void;
+  onViewTerms?: () => void;
+  onViewPrivacy?: () => void;
 }
 
-export function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
+export function WelcomeScreen({ onContinue, onViewTerms, onViewPrivacy }: WelcomeScreenProps) {
   const [selectedRole, setSelectedRole] = useState<'client' | 'detailer' | null>(null);
 
   const handleContinue = () => {
@@ -214,7 +216,30 @@ export function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
           transition={{ delay: 0.9 }}
           className="text-center text-xs text-gray-400 pt-4"
         >
-          By continuing, you agree to our Terms of Service and Privacy Policy
+          By continuing, you agree to our{' '}
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              if (onViewTerms) {
+                onViewTerms();
+              }
+            }}
+            className="text-[#0078FF] hover:text-[#0056CC] underline transition-colors"
+          >
+            Terms of Service
+          </button>
+          {' '}and{' '}
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              if (onViewPrivacy) {
+                onViewPrivacy();
+              }
+            }}
+            className="text-[#0078FF] hover:text-[#0056CC] underline transition-colors"
+          >
+            Privacy Policy
+          </button>
         </motion.p>
       </motion.div>
     </div>

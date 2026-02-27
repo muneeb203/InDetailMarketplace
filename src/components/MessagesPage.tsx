@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { ArrowLeft, Send, Image as ImageIcon, MoreVertical, Phone, Video, User, Circle } from 'lucide-react';
+import { ArrowLeft, Send, Image as ImageIcon, MoreVertical, Phone, Video, User, Circle, Check, CheckCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface Message {
@@ -13,6 +13,8 @@ interface Message {
   text: string;
   timestamp: Date;
   image?: string;
+  delivered?: boolean;
+  read?: boolean;
 }
 
 interface Conversation {
@@ -73,6 +75,8 @@ const mockMessages: Record<string, Message[]> = {
       senderId: 'user',
       text: 'Hi Mike! Looking forward to the detail tomorrow.',
       timestamp: new Date(Date.now() - 1000 * 60 * 30),
+      delivered: true,
+      read: true,
     },
     {
       id: '2',
@@ -85,6 +89,8 @@ const mockMessages: Record<string, Message[]> = {
       senderId: 'user',
       text: 'Perfect! Do you need access to water and electricity?',
       timestamp: new Date(Date.now() - 1000 * 60 * 20),
+      delivered: true,
+      read: true,
     },
     {
       id: '4',
@@ -99,6 +105,8 @@ const mockMessages: Record<string, Message[]> = {
       senderId: 'user',
       text: 'How long will the ceramic coating take?',
       timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3),
+      delivered: true,
+      read: true,
     },
     {
       id: '2',
@@ -113,6 +121,8 @@ const mockMessages: Record<string, Message[]> = {
       senderId: 'user',
       text: 'The car looks amazing! Thank you!',
       timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5),
+      delivered: true,
+      read: true,
     },
     {
       id: '2',
@@ -127,8 +137,10 @@ export function MessagesPage() {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messageText, setMessageText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isUserTyping, setIsUserTyping] = useState(false);
   const [messages, setMessages] = useState<Record<string, Message[]>>(mockMessages);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -138,6 +150,26 @@ export function MessagesPage() {
     scrollToBottom();
   }, [selectedConversation, messages]);
 
+  // Handle user typing indicator
+  const handleTyping = (text: string) => {
+    setMessageText(text);
+    
+    // Broadcast typing status
+    if (!isUserTyping && text.length > 0) {
+      setIsUserTyping(true);
+    }
+
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    // Set new timeout to stop typing indicator
+    typingTimeoutRef.current = setTimeout(() => {
+      setIsUserTyping(false);
+    }, 1000);
+  };
+
   const handleSendMessage = () => {
     if (!messageText.trim() || !selectedConversation) return;
 
@@ -146,6 +178,8 @@ export function MessagesPage() {
       senderId: 'user',
       text: messageText,
       timestamp: new Date(),
+      delivered: false,
+      read: false,
     };
 
     setMessages({
@@ -154,6 +188,17 @@ export function MessagesPage() {
     });
 
     setMessageText('');
+    setIsUserTyping(false);
+
+    // Simulate message delivery
+    setTimeout(() => {
+      setMessages(prev => ({
+        ...prev,
+        [selectedConversation.id]: prev[selectedConversation.id].map(msg =>
+          msg.id === newMessage.id ? { ...msg, delivered: true } : msg
+        ),
+      }));
+    }, 500);
 
     // Simulate typing indicator
     setIsTyping(true);
@@ -169,6 +214,16 @@ export function MessagesPage() {
         ...prev,
         [selectedConversation.id]: [...(prev[selectedConversation.id] || []), autoReply],
       }));
+
+      // Simulate read receipt after 2 seconds
+      setTimeout(() => {
+        setMessages(prev => ({
+          ...prev,
+          [selectedConversation.id]: prev[selectedConversation.id].map(msg =>
+            msg.id === newMessage.id ? { ...msg, read: true } : msg
+          ),
+        }));
+      }, 2000);
     }, 2000);
   };
 
@@ -351,9 +406,22 @@ export function MessagesPage() {
                     >
                       <p className="text-sm leading-relaxed">{message.text}</p>
                     </div>
-                    <span className="text-xs text-gray-500 mt-1 px-1">
-                      {formatMessageTime(message.timestamp)}
-                    </span>
+                    <div className="flex items-center gap-1 mt-1 px-1">
+                      <span className="text-xs text-gray-500">
+                        {formatMessageTime(message.timestamp)}
+                      </span>
+                      {isUser && (
+                        <span className="text-xs">
+                          {message.read ? (
+                            <CheckCheck className="w-3.5 h-3.5 text-blue-500" />
+                          ) : message.delivered ? (
+                            <CheckCheck className="w-3.5 h-3.5 text-gray-400" />
+                          ) : (
+                            <Check className="w-3.5 h-3.5 text-gray-400" />
+                          )}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </motion.div>
               );
@@ -386,6 +454,12 @@ export function MessagesPage() {
 
           {/* Message Input */}
           <div className="p-4 border-t border-gray-200 bg-white">
+            {/* Show when user is typing (for demo purposes) */}
+            {isUserTyping && (
+              <div className="text-xs text-gray-500 mb-2 px-2">
+                You are typing...
+              </div>
+            )}
             <div className="flex items-end gap-2">
               <Button
                 variant="ghost"
@@ -397,7 +471,7 @@ export function MessagesPage() {
               <div className="flex-1 relative">
                 <Input
                   value={messageText}
-                  onChange={(e) => setMessageText(e.target.value)}
+                  onChange={(e) => handleTyping(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();

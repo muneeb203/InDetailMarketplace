@@ -105,8 +105,8 @@ export async function fetchDetailers(filters?: DetailerFilters): Promise<Detaile
         }),
         serviceRadius: dealer.service_radius_miles ?? servicesOffered.serviceRadius ?? 15,
         priceRange: dealer.price_range || '$$',
-        rating: dealer.rating || 4.5,
-        reviewCount: dealer.review_count || 0,
+        rating: dealer.rating ?? 0,
+        reviewCount: dealer.review_count ?? 0,
         photos: dealer.portfolio_images || [],
         portfolioImages: (dealer.portfolio_images || []).map((url: string, idx: number) => ({
           id: `${dealer.id}-${idx}`,
@@ -223,8 +223,8 @@ export async function fetchDetailerById(id: string): Promise<Detailer | null> {
       location: data.base_location || 'Unknown',
       serviceRadius: data.service_radius_miles ?? servicesOffered.serviceRadius ?? 15,
       priceRange: data.price_range || '$',
-      rating: data.rating || 0,
-      reviewCount: data.review_count || 0,
+      rating: data.rating ?? 0,
+      reviewCount: data.review_count ?? 0,
       photos: data.portfolio_images || [],
       portfolioImages: data.portfolio_images?.map((url: string, idx: number) => ({
         id: `${data.id}-${idx}`,

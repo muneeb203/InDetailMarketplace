@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -13,116 +13,59 @@ import {
   MessageSquare, 
   FileText, 
   XCircle,
-  Navigation,
   Play,
   ArrowLeft,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { toast } from "sonner";
+import { fetchOrderById } from '../services/orderService';
+import type { Order } from '../types';
 
 type JobStatus = 'requested' | 'accepted' | 'on-the-way' | 'started' | 'completed' | 'cancelled';
 
-interface StatusStep {
-  id: JobStatus;
-  label: string;
-  icon: typeof Circle;
-  timestamp?: string;
-}
-
-interface JobDetails {
-  id: string;
-  detailer: {
-    name: string;
-    avatar: string;
-    rating: number;
-  };
-  vehicle: {
-    make: string;
-    model: string;
-    year: number;
-  };
-  service: string;
-  scheduledDate: string;
-  scheduledTime: string;
-  address: string;
-  totalPrice: number;
-  status: JobStatus;
-  currentStep: number;
-  eta?: string;
-  lastUpdate?: string;
-  steps: StatusStep[];
-}
-
-const mockJobDetails: JobDetails = {
-  id: 'BK-2025-001',
-  detailer: {
-    name: 'Mike Johnson',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mike',
-    rating: 4.9,
-  },
-  vehicle: {
-    make: 'Tesla',
-    model: 'Model 3',
-    year: 2022,
-  },
-  service: 'Premium Interior & Exterior Detail',
-  scheduledDate: 'Oct 20, 2025',
-  scheduledTime: '2:00 PM',
-  address: '123 Main St, San Francisco, CA 94102',
-  totalPrice: 189,
-  status: 'on-the-way',
-  currentStep: 2,
-  eta: '12 min',
-  lastUpdate: '5 min ago',
-  steps: [
-    {
-      id: 'requested',
-      label: 'Requested',
-      icon: Circle,
-      timestamp: 'Oct 19, 10:30 AM',
-    },
-    {
-      id: 'accepted',
-      label: 'Accepted',
-      icon: Circle,
-      timestamp: 'Oct 19, 10:45 AM',
-    },
-    {
-      id: 'on-the-way',
-      label: 'On the Way',
-      icon: Navigation,
-      timestamp: 'Oct 20, 1:48 PM',
-    },
-    {
-      id: 'started',
-      label: 'Started',
-      icon: Play,
-      timestamp: undefined,
-    },
-    {
-      id: 'completed',
-      label: 'Completed',
-      icon: CheckCircle2,
-      timestamp: undefined,
-    },
-  ],
-};
-
 interface ClientJobStatusPageProps {
-  bookingId?: string;
+  bookingId: string; // Now required - the order ID
   onBack?: () => void;
   onNavigateToMessages?: () => void;
 }
 
 export function ClientJobStatusPage({ 
-  bookingId = 'BK-2025-001', 
+  bookingId,
   onBack,
   onNavigateToMessages 
 }: ClientJobStatusPageProps) {
-  const [jobDetails] = useState<JobDetails>(mockJobDetails);
+  const [order, setOrder] = useState<Order | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+
+  // Fetch real order data
+  useEffect(() => {
+    async function loadOrder() {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await fetchOrderById(bookingId);
+        if (!data) {
+          setError('Order not found');
+        } else {
+          setOrder(data);
+        }
+      } catch (err: any) {
+        console.error('Error loading order:', err);
+        setError(err.message || 'Failed to load order');
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    if (bookingId) {
+      loadOrder();
+    }
+  }, [bookingId]);
 
   const handleMessageDetailer = () => {
     if (onNavigateToMessages) {
@@ -135,10 +78,69 @@ export function ClientJobStatusPage({
   const handleCancelJob = () => {
     toast.success('Booking cancelled. Refund will be processed within 3-5 business days.');
     setShowCancelDialog(false);
-    // In production, this would update the booking status
+    // TODO: Update order status to 'rejected' in database
   };
 
-  const canCancel = jobDetails.currentStep <= 1; // Can only cancel if Requested or Accepted
+  // Map order status to job status steps
+  const getStatusStep = (status: Order['status']): number => {
+    const statusMap: Record<Order['status'], number> = {
+      'pending': 0,
+      'countered': 0,
+      'accepted': 1,
+      'rejected': -1,
+      'paid': 2,
+      'in_progress': 3,
+      'completed': 4,
+    };
+    return statusMap[status] ?? 0;
+  };
+
+  const canCancel = order && ['pending', 'countered', 'accepted'].includes(order.status);
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center bg-gradient-to-b from-[#EAF5FF] to-white">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-2" />
+          <p className="text-gray-600">Loading order details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !order) {
+    return (
+      <div className="h-full flex flex-col bg-gradient-to-b from-[#EAF5FF] to-white">
+        <div className="bg-white border-b border-gray-200 px-4 py-3">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="flex items-center gap-2 text-gray-700 hover:text-gray-900"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              <span>Back</span>
+            </button>
+          )}
+        </div>
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="text-center">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+            <h2 className="text-lg font-semibold mb-2">Order Not Found</h2>
+            <p className="text-gray-600 mb-4">{error || 'This order could not be loaded.'}</p>
+            {onBack && (
+              <Button onClick={onBack} variant="outline">
+                Go Back
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const currentStep = getStatusStep(order.status);
 
   return (
     <div className="h-full flex flex-col bg-gradient-to-b from-[#EAF5FF] to-white overflow-hidden">
@@ -171,15 +173,13 @@ export function ClientJobStatusPage({
           <Card className="p-4 border">
             <div className="flex items-center gap-3">
               <Avatar className="w-12 h-12">
-                <AvatarImage src={jobDetails.detailer.avatar} />
-                <AvatarFallback>{jobDetails.detailer.name[0]}</AvatarFallback>
+                <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${order.dealer?.business_name || 'dealer'}`} />
+                <AvatarFallback>{(order.dealer?.business_name || 'D')[0]}</AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm truncate">{jobDetails.detailer.name}</h3>
+                <h3 className="text-sm truncate">{order.dealer?.business_name || 'Detailer'}</h3>
                 <div className="flex items-center gap-1 text-xs text-gray-600">
-                  <span>★ {jobDetails.detailer.rating}</span>
-                  <span>•</span>
-                  <span>{jobDetails.vehicle.year} {jobDetails.vehicle.make} {jobDetails.vehicle.model}</span>
+                  <span>Order #{order.id.slice(0, 8)}</span>
                 </div>
               </div>
               <Button
@@ -195,7 +195,7 @@ export function ClientJobStatusPage({
           </Card>
 
           {/* Live Status Banner */}
-          {jobDetails.currentStep > 0 && jobDetails.currentStep < 4 && (
+          {currentStep > 0 && currentStep < 4 && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -205,23 +205,15 @@ export function ClientJobStatusPage({
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
                   <span className="text-sm text-gray-900">
-                    {jobDetails.status === 'on-the-way' && 'Detailer is on the way'}
-                    {jobDetails.status === 'started' && 'Service in progress'}
-                    {jobDetails.status === 'accepted' && 'Detailer accepted your request'}
+                    {order.status === 'in_progress' && 'Service in progress'}
+                    {order.status === 'paid' && 'Payment confirmed'}
+                    {order.status === 'accepted' && 'Detailer accepted your request'}
                   </span>
                 </div>
-                {jobDetails.eta && jobDetails.status === 'on-the-way' && (
-                  <Badge className="bg-[#0078FF] text-white text-xs">
-                    <Clock className="w-3 h-3 mr-1" />
-                    ETA {jobDetails.eta}
-                  </Badge>
-                )}
               </div>
-              {jobDetails.lastUpdate && (
-                <p className="text-xs text-gray-600 mt-2">
-                  Last update {jobDetails.lastUpdate}
-                </p>
-              )}
+              <p className="text-xs text-gray-600 mt-2">
+                Last update {new Date(order.updated_at).toLocaleString()}
+              </p>
             </motion.div>
           )}
 
@@ -229,9 +221,15 @@ export function ClientJobStatusPage({
           <Card className="p-4 border">
             <h2 className="text-sm mb-4">Progress</h2>
             <div className="relative">
-              {jobDetails.steps.map((step, index) => {
-                const isCompleted = index < jobDetails.currentStep;
-                const isCurrent = index === jobDetails.currentStep;
+              {[
+                { id: 'pending', label: 'Requested', icon: Circle },
+                { id: 'accepted', label: 'Accepted', icon: Circle },
+                { id: 'paid', label: 'Payment Confirmed', icon: Circle },
+                { id: 'in_progress', label: 'In Progress', icon: Play },
+                { id: 'completed', label: 'Completed', icon: CheckCircle2 },
+              ].map((step, index) => {
+                const isCompleted = index < currentStep;
+                const isCurrent = index === currentStep;
                 const Icon = step.icon;
 
                 return (
@@ -256,7 +254,7 @@ export function ClientJobStatusPage({
                         </div>
 
                         {/* Connector Line */}
-                        {index < jobDetails.steps.length - 1 && (
+                        {index < 4 && (
                           <div
                             className={`absolute left-4 top-8 w-0.5 h-6 transition-all ${
                               isCompleted ? 'bg-green-500' : 'bg-gray-200'
@@ -275,9 +273,6 @@ export function ClientJobStatusPage({
                           >
                             {step.label}
                           </h3>
-                          {step.timestamp && (
-                            <span className="text-xs text-gray-500">{step.timestamp}</span>
-                          )}
                         </div>
                         {isCurrent && (
                           <p className="text-xs text-[#0078FF] mt-1">Current status</p>
@@ -305,31 +300,41 @@ export function ClientJobStatusPage({
             </div>
 
             <div className="space-y-2.5">
-              <div className="flex items-start gap-2">
-                <Clock className="w-4 h-4 text-[#0078FF] mt-0.5 flex-shrink-0" />
-                <div className="flex-1">
-                  <p className="text-xs text-gray-600">Scheduled</p>
-                  <p className="text-sm text-gray-900">
-                    {jobDetails.scheduledDate} at {jobDetails.scheduledTime}
-                  </p>
+              {order.scheduled_date && (
+                <div className="flex items-start gap-2">
+                  <Clock className="w-4 h-4 text-[#0078FF] mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-600">Scheduled</p>
+                    <p className="text-sm text-gray-900">
+                      {new Date(order.scheduled_date).toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        year: 'numeric' 
+                      })}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <div className="flex items-start gap-2">
-                <MapPin className="w-4 h-4 text-[#0078FF] mt-0.5 flex-shrink-0" />
-                <div className="flex-1">
-                  <p className="text-xs text-gray-600">Location</p>
-                  <p className="text-sm text-gray-900">{jobDetails.address}</p>
+              {order.dealer?.base_location && (
+                <div className="flex items-start gap-2">
+                  <MapPin className="w-4 h-4 text-[#0078FF] mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-600">Service Area</p>
+                    <p className="text-sm text-gray-900">{order.dealer.base_location}</p>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <div className="flex items-start gap-2">
-                <FileText className="w-4 h-4 text-[#0078FF] mt-0.5 flex-shrink-0" />
-                <div className="flex-1">
-                  <p className="text-xs text-gray-600">Service</p>
-                  <p className="text-sm text-gray-900">{jobDetails.service}</p>
+              {order.notes && (
+                <div className="flex items-start gap-2">
+                  <FileText className="w-4 h-4 text-[#0078FF] mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-600">Notes</p>
+                    <p className="text-sm text-gray-900">{order.notes}</p>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </Card>
 
@@ -363,45 +368,47 @@ export function ClientJobStatusPage({
           <DialogHeader>
             <DialogTitle className="text-base">Booking Details</DialogTitle>
             <DialogDescription className="text-xs">
-              Booking ID: {jobDetails.id}
+              Order ID: {order.id}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3">
-            <div>
-              <p className="text-xs text-gray-600 mb-1">Service</p>
-              <p className="text-sm text-gray-900">{jobDetails.service}</p>
-            </div>
+            {order.notes && (
+              <div>
+                <p className="text-xs text-gray-600 mb-1">Service Notes</p>
+                <p className="text-sm text-gray-900">{order.notes}</p>
+              </div>
+            )}
 
-            <div>
-              <p className="text-xs text-gray-600 mb-1">Vehicle</p>
-              <p className="text-sm text-gray-900">
-                {jobDetails.vehicle.year} {jobDetails.vehicle.make} {jobDetails.vehicle.model}
-              </p>
-            </div>
+            {order.scheduled_date && (
+              <div>
+                <p className="text-xs text-gray-600 mb-1">Scheduled</p>
+                <p className="text-sm text-gray-900">
+                  {new Date(order.scheduled_date).toLocaleDateString('en-US', { 
+                    month: 'long', 
+                    day: 'numeric', 
+                    year: 'numeric' 
+                  })}
+                </p>
+              </div>
+            )}
 
-            <div>
-              <p className="text-xs text-gray-600 mb-1">Scheduled</p>
-              <p className="text-sm text-gray-900">
-                {jobDetails.scheduledDate} at {jobDetails.scheduledTime}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-xs text-gray-600 mb-1">Location</p>
-              <p className="text-sm text-gray-900">{jobDetails.address}</p>
-            </div>
+            {order.dealer?.base_location && (
+              <div>
+                <p className="text-xs text-gray-600 mb-1">Service Area</p>
+                <p className="text-sm text-gray-900">{order.dealer.base_location}</p>
+              </div>
+            )}
 
             <div>
               <p className="text-xs text-gray-600 mb-1">Detailer</p>
               <div className="flex items-center gap-2">
                 <Avatar className="w-8 h-8">
-                  <AvatarImage src={jobDetails.detailer.avatar} />
-                  <AvatarFallback>{jobDetails.detailer.name[0]}</AvatarFallback>
+                  <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${order.dealer?.business_name || 'dealer'}`} />
+                  <AvatarFallback>{(order.dealer?.business_name || 'D')[0]}</AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="text-sm text-gray-900">{jobDetails.detailer.name}</p>
-                  <p className="text-xs text-gray-600">★ {jobDetails.detailer.rating}</p>
+                  <p className="text-sm text-gray-900">{order.dealer?.business_name || 'Detailer'}</p>
                 </div>
               </div>
             </div>
@@ -409,7 +416,9 @@ export function ClientJobStatusPage({
             <div className="pt-2 border-t">
               <div className="flex items-center justify-between">
                 <span className="text-sm">Total</span>
-                <span className="text-base text-gray-900">${jobDetails.totalPrice}</span>
+                <span className="text-base text-gray-900">
+                  ${order.agreed_price ?? order.proposed_price}
+                </span>
               </div>
             </div>
           </div>
