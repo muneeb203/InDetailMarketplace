@@ -40,9 +40,14 @@ export function useDealerProfile(userId: string | undefined) {
         .from('dealer_profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (fetchError) throw fetchError;
+      if (!profile) {
+        setData(null);
+        setLoading(false);
+        return;
+      }
       const servicesOffered = profile?.services_offered as Record<string, unknown> | undefined;
       setData({
         logo_url: profile?.logo_url ?? null,

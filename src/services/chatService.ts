@@ -104,6 +104,8 @@ export interface ConversationWithDetails extends ConversationRow {
   otherPartyAvatar?: string;
   lastMessagePreview?: string;
   lastMessageAt?: string;
+  /** Number of unread messages in this conversation for the current user */
+  unreadCount?: number;
 }
 
 /**
@@ -147,18 +149,23 @@ export async function fetchConversationsWithDetails(
     });
   }
 
-  return rows.map((r, i) => {
-    const otherId = role === 'client' ? r.dealer_id : r.client_id;
-    const other = otherPartyMap.get(otherId);
-    const last = lastPreviews[i];
-    return {
-      ...r,
-      otherPartyName: other?.name ?? 'Unknown',
-      otherPartyAvatar: other?.avatar,
-      lastMessagePreview: last?.message_text ?? undefined,
-      lastMessageAt: last?.created_at,
-    };
-  });
+  const withUnread = await Promise.all(
+    rows.map(async (r, i) => {
+      const otherId = role === 'client' ? r.dealer_id : r.client_id;
+      const other = otherPartyMap.get(otherId);
+      const last = lastPreviews[i];
+      const unreadCount = await getUnreadCountForConversation(r.id, userId, role);
+      return {
+        ...r,
+        otherPartyName: other?.name ?? 'Unknown',
+        otherPartyAvatar: other?.avatar,
+        lastMessagePreview: last?.message_text ?? undefined,
+        lastMessageAt: last?.created_at,
+        unreadCount,
+      };
+    })
+  );
+  return withUnread;
 }
 
 /**
@@ -227,6 +234,36 @@ export async function markConversationAsRead(
     .eq(role === 'client' ? 'client_id' : 'dealer_id', userId);
 
   if (error) throw error;
+}
+
+/**
+ * Get unread message count for a single conversation.
+ */
+export async function getUnreadCountForConversation(
+  conversationId: string,
+  userId: string,
+  role: 'client' | 'detailer'
+): Promise<number> {
+  const { data: conv, error: convError } = await supabase
+    .from('conversations')
+    .select('client_last_read_at, dealer_last_read_at')
+    .eq('id', conversationId)
+    .maybeSingle();
+
+  if (convError || !conv) return 0;
+
+  const readCol = role === 'client' ? 'client_last_read_at' : 'dealer_last_read_at';
+  const since = conv[readCol] || '1970-01-01T00:00:00Z';
+
+  const { count, error } = await supabase
+    .from('messages')
+    .select('*', { count: 'exact', head: true })
+    .eq('conversation_id', conversationId)
+    .neq('sender_id', userId)
+    .gt('created_at', since);
+
+  if (error) return 0;
+  return count ?? 0;
 }
 
 /**

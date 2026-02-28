@@ -34,7 +34,7 @@ import { toast } from "sonner";
 import { Customer, Detailer, Lead } from "./types";
 import { useDetailers } from "./hooks/useDetailers";
 import { useDebounce } from "./hooks/useDebounce";
-import { signUpAuthOnly, createClientProfile, createDealerProfile, signInAndLoadProfile } from "./services/supabaseAuth";
+import { signUpAuthOnly, createMinimalProfile, createClientProfile, createDealerProfile, signInAndLoadProfile } from "./services/supabaseAuth";
 import { supabase } from "./lib/supabaseClient";
 import { getLeadCost } from "./services/stripeService";
 import { FileText, AlertCircle, ArrowLeft } from "lucide-react";
@@ -189,6 +189,29 @@ export default function AppRoleAware() {
         }
 
         if (result.appRole === "client") {
+          if (!result.clientProfile) {
+            setTempUserData({
+              userId: result.user.id,
+              name: result.profile.name,
+              email: result.profile.email,
+              phone: result.profile.phone ?? "",
+              role: "client",
+            });
+            const clientUser: Customer & { role: "client" } = {
+              id: result.profile.id,
+              role: "client",
+              email: result.profile.email,
+              phone: result.profile.phone ?? "",
+              name: result.profile.name,
+              location: "Unknown",
+              createdAt: new Date(result.profile.created_at ?? new Date()),
+              vehicles: [],
+            };
+            setCurrentUser(clientUser);
+            setCurrentView("onboarding-client");
+            toast.success("Welcome back! Please complete your profile.");
+            return;
+          }
           const clientUser: Customer & { role: "client" } = {
             id: result.profile.id,
             role: "client",
@@ -215,7 +238,42 @@ export default function AppRoleAware() {
           toast.success("Signed in as client");
         } else if (result.appRole === "detailer") {
           const dealer = result.dealerProfile;
-          
+          if (!dealer) {
+            setTempUserData({
+              userId: result.user.id,
+              name: result.profile.name,
+              email: result.profile.email,
+              phone: result.profile.phone ?? "",
+              role: "detailer",
+            });
+            const detailerUser: Detailer & { role: "detailer" } = {
+              id: result.profile.id,
+              role: "detailer",
+              email: result.profile.email,
+              phone: result.profile.phone ?? "",
+              name: result.profile.name,
+              businessName: "My Detailing Business",
+              bio: "Complete your profile to get started.",
+              avatar:
+                result.profile.avatar_url ??
+                "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80",
+              location: "Unknown",
+              serviceRadius: 15,
+              priceRange: "$",
+              rating: 0,
+              photos: [],
+              services: [],
+              specialties: [],
+              isPro: false,
+              wallet: 0,
+              completedJobs: 0,
+              createdAt: new Date(result.profile.created_at ?? new Date()),
+            };
+            setCurrentUser(detailerUser);
+            setCurrentView("onboarding-detailer");
+            toast.success("Welcome back! Please complete your business details.");
+            return;
+          }
           // Fetch completed jobs count from orders table
           const { count: completedJobsCount } = await supabase
             .from('orders')
@@ -273,6 +331,13 @@ export default function AppRoleAware() {
   }) => {
     try {
       const user = await signUpAuthOnly(data.email, data.password);
+      await createMinimalProfile({
+        userId: user.id,
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        role: data.role,
+      });
 
       setTempUserData({
         userId: user.id,

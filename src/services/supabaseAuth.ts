@@ -27,6 +27,22 @@ export async function signUpAuthOnly(email: string, password: string) {
   return data.user;
 }
 
+/** Creates only the profiles row so login works even if user never completed onboarding. */
+export async function createMinimalProfile(params: {
+  userId: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: 'client' | 'dealer';
+}) {
+  const { userId, name, email, phone, role } = params;
+  const { error } = await supabase.from('profiles').upsert(
+    { id: userId, role, name, email, phone },
+    { onConflict: 'id' }
+  );
+  if (error) throw error;
+}
+
 export async function createClientProfile(params: {
   userId: string;
   name: string;
@@ -140,13 +156,28 @@ export async function signInAndLoadProfile(email: string, password: string) {
   const user = authData.user;
   if (!user) throw new Error('No user returned from Supabase signIn');
 
-  const { data: profile, error: profileError } = await supabase
+  let { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
-    .single();
-  if (profileError || !profile) {
-    throw profileError || new Error('Profile not found for user');
+    .maybeSingle();
+  if (profileError) throw profileError;
+  if (!profile) {
+    const name = (user.user_metadata?.name as string) || user.email?.split('@')[0] || 'User';
+    await createMinimalProfile({
+      userId: user.id,
+      name,
+      email: user.email ?? '',
+      phone: (user.user_metadata?.phone as string) || '',
+      role: 'client',
+    });
+    const { data: created, error: createdErr } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (createdErr || !created) throw createdErr || new Error('Could not create profile');
+    profile = created;
   }
 
   const appRole = dbRoleToAppRole(profile.role as DbRole);
@@ -159,7 +190,7 @@ export async function signInAndLoadProfile(email: string, password: string) {
       .from('client_profiles')
       .select('*')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
     if (error) throw error;
     clientProfile = data;
   } else if (profile.role === 'dealer') {
@@ -167,7 +198,7 @@ export async function signInAndLoadProfile(email: string, password: string) {
       .from('dealer_profiles')
       .select('*')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
     if (error) throw error;
     dealerProfile = data;
   }

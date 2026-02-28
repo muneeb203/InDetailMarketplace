@@ -63,8 +63,7 @@ export function MessagesPageIntegrated({
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  // Load conversations
-  useEffect(() => {
+  const loadConversations = useCallback(() => {
     if (!userId) return;
     setLoading(true);
     setError(null);
@@ -76,6 +75,20 @@ export function MessagesPageIntegrated({
       })
       .finally(() => setLoading(false));
   }, [userId, userRole]);
+
+  // Load conversations on mount and when returning to list (so unread counts are fresh)
+  useEffect(() => {
+    loadConversations();
+  }, [loadConversations]);
+
+  // When returning to list from a conversation, refetch so unread counts are up to date
+  const prevSelectedRef = useRef<typeof selectedConversation>(null);
+  useEffect(() => {
+    if (prevSelectedRef.current !== null && selectedConversation === null) {
+      loadConversations();
+    }
+    prevSelectedRef.current = selectedConversation;
+  }, [selectedConversation, loadConversations]);
 
   // When dealerIdToOpen is set (client clicked "Message Dealer"), find or create conversation and open it.
   // Note: parent should clear dealerIdToOpen after we've processed it to avoid re-running on remount.
@@ -116,6 +129,11 @@ export function MessagesPageIntegrated({
     const convId = selectedConversation.id;
     onViewingConversation?.(convId);
     onMarkAsRead?.(convId);
+
+    // Optimistically clear unread in list so row is no longer bold
+    setConversations((prev) =>
+      prev.map((c) => (c.id === convId ? { ...c, unreadCount: 0 } : c))
+    );
 
     fetchMessages(convId)
       .then(setMessages)
@@ -211,36 +229,49 @@ export function MessagesPageIntegrated({
                   : 'No conversations yet. Clients will appear here when they message you.'}
               </div>
             ) : (
-              conversations.map((conv, index) => (
-                <motion.div
-                  key={conv.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  onClick={() => setSelectedConversation(conv)}
-                  className="p-4 border-b border-gray-100 cursor-pointer transition-all hover:bg-gray-50 active:bg-blue-50"
-                >
-                  <div className="flex items-start gap-3">
-                    <Avatar className="w-11 h-11 border border-gray-200 flex-shrink-0">
-                      <AvatarImage src={conv.otherPartyAvatar} />
-                      <AvatarFallback>{conv.otherPartyName[0]}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-0.5">
-                        <p className="text-sm truncate">{conv.otherPartyName}</p>
-                        {conv.lastMessageAt && (
-                          <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
-                            {formatTime(conv.lastMessageAt)}
-                          </span>
-                        )}
+              conversations.map((conv, index) => {
+                const unread = conv.unreadCount ?? 0;
+                const hasUnread = unread > 0;
+                return (
+                  <motion.div
+                    key={conv.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    onClick={() => setSelectedConversation(conv)}
+                    className="p-4 border-b border-gray-100 cursor-pointer transition-all hover:bg-gray-50 active:bg-blue-50"
+                  >
+                    <div className="flex items-start gap-3">
+                      <Avatar className="w-11 h-11 border border-gray-200 flex-shrink-0">
+                        <AvatarImage src={conv.otherPartyAvatar} />
+                        <AvatarFallback>{conv.otherPartyName[0]}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-0.5 gap-2">
+                          <p className={`text-sm truncate ${hasUnread ? 'font-semibold text-gray-900' : ''}`}>
+                            {conv.otherPartyName}
+                          </p>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {hasUnread && (
+                              <span className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-[#0078FF] text-white text-xs font-medium">
+                                {unread > 99 ? '99+' : unread}
+                              </span>
+                            )}
+                            {conv.lastMessageAt && (
+                              <span className={`text-xs flex-shrink-0 ${hasUnread ? 'text-gray-700 font-medium' : 'text-gray-500'}`}>
+                                {formatTime(conv.lastMessageAt)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <p className={`text-xs truncate ${hasUnread ? 'font-medium text-gray-800' : 'text-gray-600'}`}>
+                          {conv.lastMessagePreview || 'No messages yet'}
+                        </p>
                       </div>
-                      <p className="text-xs text-gray-600 truncate">
-                        {conv.lastMessagePreview || 'No messages yet'}
-                      </p>
                     </div>
-                  </div>
-                </motion.div>
-              ))
+                  </motion.div>
+                );
+              })
             )}
           </div>
         </div>
