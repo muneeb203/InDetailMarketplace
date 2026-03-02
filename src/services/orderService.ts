@@ -345,18 +345,20 @@ export function subscribeToDealerOrders(
         filter: `dealer_id=eq.${dealerId}`,
       },
       async (payload) => {
-        console.log('Dealer orders subscription event:', payload.eventType, payload);
-        const order = mapRowToOrder(payload.new as Record<string, unknown>);
-        if (payload.eventType === 'INSERT') {
-          console.log('New order inserted:', order);
-          onInsert(order);
+        const eventType = payload.eventType ?? (payload as any).event_type;
+        const raw = (payload.new ?? (payload as any).new) as Record<string, unknown> | undefined;
+        if (!raw) return;
+        const order = mapRowToOrder(raw);
+        if (eventType === 'INSERT') {
           enrichSingleOrderWithClient(order).then((enriched) => {
-            console.log('Order enriched with client:', enriched);
-            enriched && onUpdate(enriched);
+            if (enriched) {
+              onInsert(enriched);
+            } else {
+              onInsert(order);
+            }
           });
-        } else if (payload.eventType === 'UPDATE') {
-          console.log('Order updated:', order);
-          onUpdate(order);
+        } else if (eventType === 'UPDATE') {
+          enrichSingleOrderWithClient(order).then((enriched) => enriched && onUpdate(enriched));
         }
       }
     )

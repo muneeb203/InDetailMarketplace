@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Order } from '../../types';
 import {
   fetchDealerOrders,
@@ -20,8 +20,11 @@ import {
   Clock,
   DollarSign,
   Bell,
+  Radio,
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+const POLL_INTERVAL_MS = 12_000;
 
 interface DealerOrdersQueueProps {
   dealerId: string;
@@ -44,6 +47,9 @@ export function DealerOrdersQueue({ dealerId, onNavigate }: DealerOrdersQueuePro
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [newOrderIds, setNewOrderIds] = useState<Set<string>>(new Set());
   const [pendingCount, setPendingCount] = useState(0);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
+  const [liveIndicator, setLiveIndicator] = useState<'live' | 'updated' | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const mergeOrder = useCallback((order: Order) => {
     setOrders((prev) => {
@@ -62,15 +68,31 @@ export function DealerOrdersQueue({ dealerId, onNavigate }: DealerOrdersQueuePro
       if (prev.some((o) => o.id === order.id)) return prev;
       return [order, ...prev];
     });
+    setLastUpdatedAt(new Date());
+    setLiveIndicator('updated');
     if (order.status === 'pending') {
       setNewOrderIds((prev) => new Set(prev).add(order.id));
       setPendingCount((c) => c + 1);
-      toast.success('New service request received.');
+      toast.success('New service request', {
+        description: `Order from ${order.client?.name ?? 'a client'} — $${order.proposed_price}`,
+        duration: 5000,
+      });
     }
   }, []);
 
+  const mergeOrderWithIndicator = useCallback(
+    (order: Order) => {
+      mergeOrder(order);
+      setLastUpdatedAt(new Date());
+      setLiveIndicator('updated');
+    },
+    [mergeOrder]
+  );
+
+  // Initial fetch + Realtime subscription
   useEffect(() => {
     let mounted = true;
+    setLiveIndicator('live');
     fetchDealerOrders(dealerId)
       .then((data) => {
         if (mounted) setOrders(data);
@@ -78,13 +100,52 @@ export function DealerOrdersQueue({ dealerId, onNavigate }: DealerOrdersQueuePro
       .catch((err) => toast.error(err?.message || 'Failed to load orders'))
       .finally(() => mounted && setLoading(false));
 
-    const unsub = subscribeToDealerOrders(dealerId, addOrder, mergeOrder);
+    const unsub = subscribeToDealerOrders(dealerId, addOrder, mergeOrderWithIndicator);
 
     return () => {
       mounted = false;
       unsub();
     };
-  }, [dealerId, addOrder, mergeOrder]);
+  }, [dealerId, addOrder, mergeOrderWithIndicator]);
+
+  // Polling fallback so orders update even if Realtime is disabled
+  useEffect(() => {
+    if (!dealerId) return;
+    pollTimerRef.current = setInterval(() => {
+      fetchDealerOrders(dealerId)
+        .then((fresh) => {
+          setOrders((prev) => {
+            const prevIds = new Set(prev.map((o) => o.id));
+            const freshIds = new Set(fresh.map((o) => o.id));
+            const prevById = new Map(prev.map((o) => [o.id, o]));
+            let changed = false;
+            const next = fresh.map((o) => {
+              const existing = prevById.get(o.id);
+              if (!existing || existing.status !== o.status || existing.updated_at !== o.updated_at) changed = true;
+              return o;
+            });
+            if (fresh.length !== prev.length) changed = true;
+            if (changed) {
+              setLastUpdatedAt(new Date());
+              setLiveIndicator('updated');
+            }
+            return next;
+          });
+        })
+        .catch(() => {});
+    }, POLL_INTERVAL_MS);
+    return () => {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    };
+  }, [dealerId]);
+
+  // Reset "Updated X ago" back to "Live" after 30s
+  useEffect(() => {
+    if (!lastUpdatedAt) return;
+    const t = setTimeout(() => setLiveIndicator('live'), 30_000);
+    return () => clearTimeout(t);
+  }, [lastUpdatedAt]);
 
   const clearNewHighlight = (orderId: string) => {
     setNewOrderIds((prev) => {
@@ -110,10 +171,31 @@ export function DealerOrdersQueue({ dealerId, onNavigate }: DealerOrdersQueuePro
     );
   }
 
+  const updatedAgo =
+    lastUpdatedAt &&
+    (() => {
+      const sec = Math.floor((Date.now() - lastUpdatedAt.getTime()) / 1000);
+      if (sec < 10) return 'Just now';
+      if (sec < 60) return `${sec}s ago`;
+      const min = Math.floor(sec / 60);
+      return `${min}m ago`;
+    })();
+
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-gray-900">Orders Queue</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <h2 className="text-xl font-bold text-gray-900">Orders Queue</h2>
+          {liveIndicator && (
+            <span
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-full px-2.5 py-0.5"
+              title={lastUpdatedAt ? `Updated ${updatedAgo}` : 'Live'}
+            >
+              <Radio className="w-3 h-3 text-green-600" />
+              {lastUpdatedAt && updatedAgo ? `Updated ${updatedAgo}` : 'Live'}
+            </span>
+          )}
+        </div>
         {pendingCount > 0 && (
           <Badge variant="destructive" className="gap-1">
             <Bell className="w-3 h-3" />

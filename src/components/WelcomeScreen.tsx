@@ -209,6 +209,21 @@ export function WelcomeScreen({ onContinue, onViewTerms, onViewPrivacy }: Welcom
           You can change this later in Settings
         </motion.p>
 
+        {/* Admin Panel link - isolated, no impact on client/dealer flow */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.85 }}
+          className="text-center text-xs"
+        >
+          <a
+            href="/admin/login"
+            className="text-gray-400 hover:text-gray-600 underline transition-colors"
+          >
+            Click here for Admin Panel
+          </a>
+        </motion.p>
+
         {/* Footer */}
         <motion.p
           initial={{ opacity: 0 }}
