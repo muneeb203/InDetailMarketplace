@@ -89,7 +89,7 @@ export function MarketplaceWeb({ detailers, onSelectDetailer, onRequestQuote }: 
 
               {/* Description */}
               <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                {detailer.bio || 'I'm sedentary house yours wantink you placemend westiber care will wantink you truck calls.'}
+                {detailer.bio || 'Professional detailing service with years of experience. Quality work guaranteed.'}
               </p>
 
               {/* Action Buttons */}
