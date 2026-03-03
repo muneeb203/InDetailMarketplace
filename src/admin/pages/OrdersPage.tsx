@@ -71,7 +71,7 @@ export function OrdersPage() {
           <thead className="bg-gray-50 text-gray-600">
             <tr>
               <th className="px-4 py-3 font-medium">Client</th>
-              <th className="px-4 py-3 font-medium">Dealer</th>
+              <th className="px-4 py-3 font-medium">Detailer</th>
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium">Proposed</th>
               <th className="px-4 py-3 font-medium">Agreed</th>

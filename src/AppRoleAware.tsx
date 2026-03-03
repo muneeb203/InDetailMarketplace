@@ -29,6 +29,7 @@ import { DetailerProfileHome } from "./components/detailer/DetailerProfileHome";
 import { TermsOfService } from "./components/TermsOfService";
 import { PrivacyPolicy } from "./components/PrivacyPolicy";
 import { WebLayout } from "./components/WebLayout";
+import { NotificationsPage } from "./components/NotificationsPage";
 import { Toaster } from "./components/ui/sonner";
 import { toast } from "sonner";
 import { Customer, Detailer, Lead } from "./types";
@@ -43,6 +44,7 @@ import { DebugDataSource } from "./components/DebugDataSource";
 import { useAuth } from "./context/AuthContext";
 import { useDealerProfile } from "./hooks/useDealerProfile";
 import { useUnreadMessages } from "./hooks/useUnreadMessages";
+import { useNotifications } from "./hooks/useNotifications";
 
 type View =
   | "welcome"
@@ -69,6 +71,7 @@ type View =
   | "quotes"
   | "alerts"
   | "settings"
+  | "notifications"
   | "terms"
   | "privacy";
 
@@ -123,6 +126,7 @@ export default function AppRoleAware() {
     currentUser?.role ?? 'client',
     viewingConversationId
   );
+  const { unreadCount: unreadNotifications } = useNotifications(currentUser?.id);
   
   // Log what we got from Supabase
   console.log('📊 Detailers from Supabase:', detailers.length, 'detailers');
@@ -205,6 +209,7 @@ export default function AppRoleAware() {
               name: result.profile.name,
               location: "Unknown",
               createdAt: new Date(result.profile.created_at ?? new Date()),
+              avatar: result.profile.avatar_url ?? undefined,
               vehicles: [],
             };
             setCurrentUser(clientUser);
@@ -220,6 +225,7 @@ export default function AppRoleAware() {
             name: result.profile.name,
             location: result.clientProfile?.base_location ?? "Unknown",
             createdAt: new Date(result.profile.created_at ?? new Date()),
+            avatar: result.profile.avatar_url ?? undefined,
             vehicles: result.clientProfile?.vehicle_make
               ? [
                   {
@@ -372,6 +378,7 @@ export default function AppRoleAware() {
     location_lng: number | null;
     vehicle?: { make: string; model: string; year: number };
     notifications: boolean;
+    avatarUrl?: string;
   }) => {
     if (!tempUserData) return;
     try {
@@ -393,6 +400,7 @@ export default function AppRoleAware() {
         name: tempUserData.name,
         location: data.location,
         createdAt: new Date(),
+        avatar: data.avatarUrl, // Add avatar URL
         vehicles: data.vehicle
           ? [
               {
@@ -630,6 +638,9 @@ export default function AppRoleAware() {
       case "settings":
         setCurrentView("settings");
         break;
+      case "notifications":
+        setCurrentView("notifications");
+        break;
     }
   };
 
@@ -743,6 +754,7 @@ export default function AppRoleAware() {
         <Toaster position="top-center" richColors />
         <ClientOnboarding
           userName={tempUserData.name}
+          userId={tempUserData.userId}
           onComplete={handleClientOnboardingComplete}
         />
       </>
@@ -1007,6 +1019,20 @@ export default function AppRoleAware() {
         </div>
       )}
 
+      {/* Notifications Page */}
+      {currentView === "notifications" && currentUser && (
+        <NotificationsPage
+          userId={currentUser.id}
+          onNavigate={(link) => {
+            // Parse link and navigate accordingly
+            if (link.startsWith('/')) {
+              const view = link.substring(1) as View;
+              setCurrentView(view);
+            }
+          }}
+        />
+      )}
+
       {/* Detailer Profile (Public - same layout as dealer View Gig) */}
       {currentView === "detailer-profile" && selectedDetailerId && (
         <ProPublicProfile
@@ -1018,6 +1044,7 @@ export default function AppRoleAware() {
             } else {
               setCurrentView("request-quote");
               toast.info("Request a quote from this detailer");
+
             }
           }}
           onMessage={() => {
@@ -1093,10 +1120,12 @@ export default function AppRoleAware() {
           userRole={currentUser.role}
           clientId={currentUser.role === 'client' ? currentUser.id : undefined}
           dealerLogoUrl={currentUser.role === 'detailer' ? dealerProfile?.logo_url : undefined}
+          clientAvatarUrl={currentUser.role === 'client' ? (currentUser as Customer).avatar : undefined}
           vehicles={currentUser.role === 'client' ? (currentUser as Customer).vehicles ?? [] : []}
           showProfileSidebar={shouldShowProfileSidebar}
           onLogout={handleLogout}
           unreadMessages={unreadCount}
+          unreadNotifications={unreadNotifications}
         >
           {mainContent}
         </WebLayout>

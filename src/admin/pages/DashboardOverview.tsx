@@ -39,7 +39,7 @@ export function DashboardOverview() {
   const s = stats!;
   const cards = [
     { label: 'Total Users', value: s.totalUsers, icon: Users },
-    { label: 'Total Dealers', value: s.totalDealers, icon: Store },
+    { label: 'Total Detailers', value: s.totalDealers, icon: Store },
     { label: 'Total Orders', value: s.totalOrders, icon: ShoppingBag },
     { label: 'Total Conversations', value: s.totalConversations, icon: MessageSquare },
     { label: 'Total Reviews', value: s.totalReviews, icon: Star },

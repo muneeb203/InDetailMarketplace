@@ -4,19 +4,23 @@ import { Input } from './ui/input';
 import { Card } from './ui/card';
 import { Progress } from './ui/progress';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { MapPin, Car, Bell, Check, ChevronDown, Search, Loader2, Minus, Plus } from 'lucide-react';
+import { MapPin, Car, Bell, Check, ChevronDown, Search, Loader2, Minus, Plus, User, Upload, X } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from './ui/utils';
 import { reverseGeocode, searchLocations, type LocationResult } from '../services/geocodingService';
+import { uploadProfilePicture, updateUserAvatar } from '../services/imageUploadService';
+import { toast } from 'sonner';
 
 interface ClientOnboardingProps {
   userName: string;
+  userId: string;
   onComplete: (data: {
     location: string;
     location_lat: number | null;
     location_lng: number | null;
     vehicle?: { make: string; model: string; year: number };
     notifications: boolean;
+    avatarUrl?: string;
   }) => void;
 }
 
@@ -34,9 +38,9 @@ function getCurrentYear() {
   return new Date().getFullYear();
 }
 
-export function ClientOnboarding({ userName, onComplete }: ClientOnboardingProps) {
+export function ClientOnboarding({ userName, userId, onComplete }: ClientOnboardingProps) {
   const [step, setStep] = useState(1);
-  const totalSteps = 3;
+  const totalSteps = 4; // Changed from 3 to 4
 
   // Step 1: Location — display string in input; lat/lng stored for DB
   const [locationDisplay, setLocationDisplay] = useState('');
@@ -206,6 +210,46 @@ export function ClientOnboarding({ userName, onComplete }: ClientOnboardingProps
   // Step 3: Notifications
   const [notifications, setNotifications] = useState(true);
 
+  // Step 4: Profile Picture
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB');
+      return;
+    }
+
+    setAvatarFile(file);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAvatarPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveAvatar = () => {
+    setAvatarFile(null);
+    setAvatarPreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const progress = (step / totalSteps) * 100;
 
   const handleNext = () => {
@@ -216,11 +260,31 @@ export function ClientOnboarding({ userName, onComplete }: ClientOnboardingProps
     }
   };
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
     const year = vehicleYear ? parseInt(vehicleYear, 10) : NaN;
     const validYear = !Number.isNaN(year) && year >= MIN_VEHICLE_YEAR && year <= getCurrentYear()
       ? year
       : undefined;
+
+    let avatarUrl: string | undefined;
+
+    // Upload avatar if selected
+    if (avatarFile) {
+      try {
+        setAvatarUploading(true);
+        avatarUrl = await uploadProfilePicture(userId, avatarFile);
+        await updateUserAvatar(userId, avatarUrl);
+        toast.success('Profile picture uploaded!');
+      } catch (error: any) {
+        console.error('Failed to upload avatar:', error);
+        toast.error('Failed to upload profile picture');
+        setAvatarUploading(false);
+        return; // Don't proceed if upload fails
+      } finally {
+        setAvatarUploading(false);
+      }
+    }
+
     onComplete({
       location: locationDisplay,
       location_lat: locationLat,
@@ -234,6 +298,7 @@ export function ClientOnboarding({ userName, onComplete }: ClientOnboardingProps
             }
           : undefined,
       notifications,
+      avatarUrl,
     });
   };
 
@@ -244,6 +309,8 @@ export function ClientOnboarding({ userName, onComplete }: ClientOnboardingProps
   const canProceed = () => {
     if (step === 1) return hasValidLocation;
     if (step === 2) return vehicleMake && vehicleModel && vehicleYear && isYearValid;
+    if (step === 3) return true; // Notifications step
+    if (step === 4) return true; // Profile picture is optional
     return true;
   };
 
@@ -562,6 +629,70 @@ export function ClientOnboarding({ userName, onComplete }: ClientOnboardingProps
               </div>
             </Card>
           )}
+
+          {/* Step 4: Profile Picture */}
+          {step === 4 && (
+            <Card className="p-6">
+              <div className="space-y-4">
+                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto">
+                  <User className="w-6 h-6 text-purple-600" />
+                </div>
+                <div className="text-center space-y-2">
+                  <h3>Add a profile picture</h3>
+                  <p className="text-sm text-gray-600">
+                    Help detailers recognize you (optional)
+                  </p>
+                </div>
+
+                <div className="flex flex-col items-center gap-4">
+                  {/* Avatar Preview */}
+                  <div className="relative">
+                    {avatarPreview ? (
+                      <div className="relative">
+                        <img
+                          src={avatarPreview}
+                          alt="Profile preview"
+                          className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-lg"
+                        />
+                        <button
+                          onClick={handleRemoveAvatar}
+                          className="absolute -top-2 -right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center border-4 border-white shadow-lg">
+                        <User className="w-16 h-16 text-gray-400" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Upload Button */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarSelect}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="w-4 h-4" />
+                    {avatarPreview ? 'Change Picture' : 'Upload Picture'}
+                  </Button>
+
+                  <p className="text-xs text-gray-500 text-center">
+                    JPG, PNG, or GIF • Max 5MB
+                  </p>
+                </div>
+              </div>
+            </Card>
+          )}
         </motion.div>
 
         {/* Navigation */}
@@ -569,9 +700,14 @@ export function ClientOnboarding({ userName, onComplete }: ClientOnboardingProps
           <Button
             onClick={handleNext}
             className="w-full gap-2"
-            disabled={!canProceed()}
+            disabled={!canProceed() || avatarUploading}
           >
-            {step === totalSteps ? (
+            {avatarUploading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Uploading...
+              </>
+            ) : step === totalSteps ? (
               <>
                 <Check className="w-4 h-4" />
                 Get Started
@@ -580,11 +716,22 @@ export function ClientOnboarding({ userName, onComplete }: ClientOnboardingProps
               'Continue'
             )}
           </Button>
+          {step === 4 && !avatarFile && (
+            <Button
+              variant="ghost"
+              onClick={handleComplete}
+              className="w-full"
+              disabled={avatarUploading}
+            >
+              Skip for now
+            </Button>
+          )}
           {step > 1 && (
             <Button
               variant="ghost"
               onClick={() => setStep(step - 1)}
               className="w-full"
+              disabled={avatarUploading}
             >
               Back
             </Button>

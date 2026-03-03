@@ -9,11 +9,12 @@ interface ProfileSidebarProps {
   userPhone?: string;
   userRole: 'client' | 'detailer';
   clientId?: string;
+  clientAvatarUrl?: string | null;
   vehicles?: Vehicle[];
   onNavigate?: (view: string) => void;
 }
 
-export function ProfileSidebar({ userName, userEmail, userPhone, userRole, clientId, vehicles: vehiclesProp = [], onNavigate }: ProfileSidebarProps) {
+export function ProfileSidebar({ userName, userEmail, userPhone, userRole, clientId, clientAvatarUrl, vehicles: vehiclesProp = [], onNavigate }: ProfileSidebarProps) {
   const { vehicles: vehiclesFromDb } = useClientProfile(userRole === 'client' ? clientId : undefined);
   const vehicles = vehiclesFromDb.length > 0 ? vehiclesFromDb : vehiclesProp;
   return (
@@ -32,9 +33,17 @@ export function ProfileSidebar({ userName, userEmail, userPhone, userRole, clien
           )}
           
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
-              <User className="w-6 h-6 text-blue-600" />
-            </div>
+            {clientAvatarUrl ? (
+              <img 
+                src={clientAvatarUrl} 
+                alt={userName}
+                className="w-12 h-12 rounded-full object-cover border-2 border-white"
+              />
+            ) : (
+              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
+                <User className="w-6 h-6 text-blue-600" />
+              </div>
+            )}
             <div>
               <h3 className="font-bold">{userName}</h3>
               <p className="text-blue-100 text-sm">Client Account</p>

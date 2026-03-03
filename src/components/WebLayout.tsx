@@ -16,10 +16,12 @@ interface WebLayoutProps {
   userRole?: 'client' | 'detailer';
   clientId?: string;
   dealerLogoUrl?: string | null;
+  clientAvatarUrl?: string | null;
   vehicles?: Vehicle[];
   showProfileSidebar?: boolean;
   onLogout?: () => void;
   unreadMessages?: number;
+  unreadNotifications?: number;
 }
 
 export function WebLayout({ 
@@ -33,10 +35,12 @@ export function WebLayout({
   userRole = "client",
   clientId,
   dealerLogoUrl,
+  clientAvatarUrl,
   vehicles = [],
   showProfileSidebar = true,
   onLogout,
   unreadMessages = 0,
+  unreadNotifications = 0,
 }: WebLayoutProps) {
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
 
@@ -52,7 +56,7 @@ export function WebLayout({
           {/* Logo */}
           <div className="flex items-center gap-2">
             <AvatarWithFallback
-              src={userRole === 'detailer' ? dealerLogoUrl : undefined}
+              src={userRole === 'detailer' ? dealerLogoUrl : clientAvatarUrl}
               name={displayName}
               size="sm"
             />
@@ -93,11 +97,16 @@ export function WebLayout({
               View Gig
             </button>
           )}
-          <button className="relative hover:opacity-80 transition-opacity">
+          <button
+            onClick={() => onNavigate('notifications')}
+            className="relative hover:opacity-80 transition-opacity"
+          >
             <Bell className="w-5 h-5 text-gray-600" />
-            <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-xs text-white flex items-center justify-center">
-              3
-            </span>
+            {unreadNotifications > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-xs text-white flex items-center justify-center">
+                {unreadNotifications > 9 ? '9+' : unreadNotifications}
+              </span>
+            )}
           </button>
         </div>
       </header>
@@ -343,6 +352,7 @@ export function WebLayout({
             userPhone={userPhone}
             userRole={userRole}
             clientId={clientId}
+            clientAvatarUrl={clientAvatarUrl}
             vehicles={vehicles}
             onNavigate={onNavigate}
           />

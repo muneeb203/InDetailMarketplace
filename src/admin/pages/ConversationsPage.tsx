@@ -37,7 +37,7 @@ export function ConversationsPage() {
             <tr>
               <th className="px-4 py-3 font-medium">Conversation ID</th>
               <th className="px-4 py-3 font-medium">Client ID</th>
-              <th className="px-4 py-3 font-medium">Dealer ID</th>
+              <th className="px-4 py-3 font-medium">Detailer ID</th>
               <th className="px-4 py-3 font-medium">Created</th>
             </tr>
           </thead>
