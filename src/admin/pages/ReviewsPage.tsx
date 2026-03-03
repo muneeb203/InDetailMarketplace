@@ -37,7 +37,7 @@ export function ReviewsPage() {
         <table className="w-full text-sm text-left">
           <thead className="bg-gray-50 text-gray-600">
             <tr>
-              <th className="px-4 py-3 font-medium">Dealer ID</th>
+              <th className="px-4 py-3 font-medium">Detailer ID</th>
               <th className="px-4 py-3 font-medium">Client ID</th>
               <th className="px-4 py-3 font-medium">Rating</th>
               <th className="px-4 py-3 font-medium">Review</th>

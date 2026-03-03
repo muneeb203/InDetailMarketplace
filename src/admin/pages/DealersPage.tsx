@@ -58,12 +58,12 @@ export function DealersPage() {
   };
 
   if (loading && rows.length === 0) {
-    return <div className="text-gray-600">Loading dealers...</div>;
+    return <div className="text-gray-600">Loading detailers...</div>;
   }
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-gray-900">Dealers</h1>
+      <h1 className="text-2xl font-bold text-gray-900">Detailers</h1>
       {error && <div className="text-red-600 bg-red-50 p-3 rounded text-sm">{error}</div>}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <table className="w-full text-sm text-left">
@@ -106,7 +106,7 @@ export function DealersPage() {
             ))}
           </tbody>
         </table>
-        {rows.length === 0 && <div className="p-8 text-center text-gray-500">No dealers found</div>}
+        {rows.length === 0 && <div className="p-8 text-center text-gray-500">No detailers found</div>}
       </div>
     </div>
   );

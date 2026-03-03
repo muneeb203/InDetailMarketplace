@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabaseClient';
 
 const BUCKET_NAME = 'detailer-images';
+const AVATARS_BUCKET = 'user-avatars'; // Separate bucket for user profile pictures
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
 /**
@@ -233,4 +234,90 @@ export async function removePortfolioImage(
   // Delete from storage
   const path = imageUrl.split('/').slice(-2).join('/');
   await deleteImage(path);
+}
+
+
+/**
+ * Upload a profile picture (avatar) for any user
+ * @param userId - The user's ID
+ * @param file - The image file to upload
+ * @returns The public URL of the uploaded image
+ */
+export async function uploadProfilePicture(
+  userId: string,
+  file: File
+): Promise<string> {
+  // Validate file
+  validateImageFile(file);
+
+  const fileExt = file.name.split('.').pop();
+  const filePath = `${userId}/avatar.${fileExt}`;
+
+  // Delete existing avatar if it exists
+  await deleteAvatarImage(filePath).catch(() => {
+    // Ignore error if file doesn't exist
+  });
+
+  // Upload new avatar to user-avatars bucket
+  const { data, error } = await supabase.storage
+    .from(AVATARS_BUCKET)
+    .upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: true,
+    });
+
+  if (error) {
+    console.error('Error uploading profile picture:', error);
+    throw new Error(`Failed to upload profile picture: ${error.message}`);
+  }
+
+  return getAvatarPublicUrl(data.path);
+}
+
+/**
+ * Get the public URL for an avatar image
+ */
+function getAvatarPublicUrl(path: string): string {
+  const { data } = supabase.storage
+    .from(AVATARS_BUCKET)
+    .getPublicUrl(path);
+  
+  return data.publicUrl;
+}
+
+/**
+ * Delete an avatar image from storage
+ * @param path - The path to the image (e.g., "user-id/avatar.jpg")
+ */
+async function deleteAvatarImage(path: string): Promise<void> {
+  const { error } = await supabase.storage
+    .from(AVATARS_BUCKET)
+    .remove([path]);
+
+  if (error) {
+    console.error('Error deleting avatar:', error);
+    throw new Error(`Failed to delete avatar: ${error.message}`);
+  }
+}
+
+/**
+ * Update user profile picture in database
+ * @param userId - The user's ID
+ * @param avatarUrl - The public URL of the avatar
+ */
+export async function updateUserAvatar(
+  userId: string,
+  avatarUrl: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      avatar_url: avatarUrl,
+    })
+    .eq('id', userId);
+
+  if (error) {
+    console.error('Error updating avatar in database:', error);
+    throw new Error(`Failed to update avatar: ${error.message}`);
+  }
 }

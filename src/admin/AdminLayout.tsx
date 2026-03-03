@@ -13,7 +13,7 @@ import {
 const nav = [
   { to: '/admin/dashboard', label: 'Dashboard Overview', icon: LayoutDashboard },
   { to: '/admin/users', label: 'Users', icon: Users },
-  { to: '/admin/dealers', label: 'Dealers', icon: Store },
+  { to: '/admin/dealers', label: 'Detailers', icon: Store },
   { to: '/admin/orders', label: 'Orders', icon: ShoppingBag },
   { to: '/admin/conversations', label: 'Conversations', icon: MessageSquare },
   { to: '/admin/reviews', label: 'Reviews', icon: Star },
