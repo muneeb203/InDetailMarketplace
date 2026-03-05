@@ -12,6 +12,7 @@ import { ServiceRadiusMap } from './ServiceRadiusMap';
 import { uploadLogoToStorage, uploadPortfolioImageToStorage } from '../services/dealerImageService';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { toast } from 'sonner';
+import { ServiceConfigurationPanel } from './ServiceConfigurationPanel';
 
 interface DetailerOnboardingProps {
   userName: string;
@@ -56,7 +57,7 @@ export function DetailerOnboarding({
   onComplete,
 }: DetailerOnboardingProps) {
   const [step, setStep] = useState(1);
-  const totalSteps = 5;
+  const totalSteps = 4; // Reduced from 5 - removed specialty selection
 
   // Step 1: Business Name
   const [businessName, setBusinessName] = useState('');
@@ -79,13 +80,10 @@ export function DetailerOnboarding({
     setRadiusInput(String(serviceRadius));
   }, [serviceRadius]);
 
-  // Step 3: Specialties
-  const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
-
-  // Step 4: Price Range
+  // Step 3: Price Range (moved from step 4)
   const [priceRange, setPriceRange] = useState('');
 
-  // Step 5: Portfolio (optional) - first image = logo (logos folder), rest = portfolio
+  // Step 4: Portfolio (optional) - first image = logo (logos folder), rest = portfolio (moved from step 5)
   const [skipPortfolio, setSkipPortfolio] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [portfolioImages, setPortfolioImages] = useState<string[]>([]);
@@ -137,7 +135,7 @@ export function DetailerOnboarding({
       location,
       locationLat,
       locationLng,
-      specialties: selectedSpecialties,
+      specialties: [], // Empty array - services will be configured in Settings → Services
       priceRange,
       portfolioImages: portfolioImages.length > 0 ? portfolioImages : undefined,
       logoUrl: logoUrl ?? undefined,
@@ -239,9 +237,8 @@ export function DetailerOnboarding({
   const canProceed = () => {
     if (step === 1) return businessName.trim().length > 0;
     if (step === 2) return location.trim().length > 0 && locationLat !== null && locationLng !== null;
-    if (step === 3) return selectedSpecialties.length > 0;
-    if (step === 4) return priceRange.length > 0;
-    if (step === 5) return true; // Logo is now optional
+    if (step === 3) return priceRange.length > 0; // Price range is now step 3
+    if (step === 4) return true; // Logo is now optional (portfolio is step 4)
     return true;
   };
 
@@ -440,47 +437,8 @@ export function DetailerOnboarding({
             </Card>
           )}
 
-          {/* Step 3: Specialties */}
+          {/* Step 3: Price Range (moved from step 4) */}
           {step === 3 && (
-            <Card className="p-6">
-              <div className="space-y-4">
-                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto">
-                  <Award className="w-6 h-6 text-purple-600" />
-                </div>
-                <div className="text-center space-y-2">
-                  <h3>What services do you offer?</h3>
-                  <p className="text-sm text-gray-600">
-                    Select all that apply
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {SPECIALTIES.map((specialty) => {
-                    const isSelected = selectedSpecialties.includes(specialty);
-                    return (
-                      <Badge
-                        key={specialty}
-                        variant={isSelected ? 'default' : 'outline'}
-                        className={`cursor-pointer px-3 py-2 transition-all ${
-                          isSelected
-                            ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
-                            : 'hover:bg-gray-100'
-                        }`}
-                        onClick={() => toggleSpecialty(specialty)}
-                      >
-                        {specialty}
-                      </Badge>
-                    );
-                  })}
-                </div>
-                <p className="text-xs text-gray-500 text-center">
-                  {selectedSpecialties.length} selected
-                </p>
-              </div>
-            </Card>
-          )}
-
-          {/* Step 4: Price Range */}
-          {step === 4 && (
             <Card className="p-6">
               <div className="space-y-4">
                 <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mx-auto">
@@ -516,8 +474,8 @@ export function DetailerOnboarding({
             </Card>
           )}
 
-          {/* Step 5: Portfolio */}
-          {step === 5 && (
+          {/* Step 4: Portfolio (moved from step 5) */}
+          {step === 4 && (
             <Card className="p-6">
               <div className="space-y-4">
                 <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center mx-auto">

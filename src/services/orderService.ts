@@ -388,3 +388,279 @@ function mapRowToOrder(row: Record<string, unknown>): Order {
     opened_at: (row.opened_at as string) || null,
   };
 }
+
+// ============================================================================
+// Service Pricing System Extensions
+// ============================================================================
+
+import type {
+  CreateOrderWithServicesData,
+  OrderWithServices,
+  OrderService as OrderServiceType,
+} from '../types/serviceTypes';
+
+/**
+ * Calculate total price for selected service offerings and vehicle category
+ */
+export async function calculateOrderTotal(
+  serviceOfferingIds: string[],
+  vehicleCategoryId: string
+): Promise<number> {
+  if (serviceOfferingIds.length === 0) {
+    return 0;
+  }
+
+  try {
+    // Fetch all service offerings with their prices
+    const { data: offerings, error } = await supabase
+      .from('service_offerings')
+      .select(`
+        id,
+        pricing_model,
+        is_active,
+        prices:service_prices(vehicle_category_id, price)
+      `)
+      .in('id', serviceOfferingIds);
+
+    if (error) {
+      console.error('Error fetching offerings for total calculation:', error);
+      throw new Error(`Failed to calculate order total: ${error.message}`);
+    }
+
+    if (!offerings) {
+      throw new Error('No offerings found');
+    }
+
+    let total = 0;
+
+    for (const offering of offerings) {
+      // Check if offering is active
+      if (!offering.is_active) {
+        throw new Error(`Service offering ${offering.id} is not active`);
+      }
+
+      // Find the appropriate price
+      let price: number | undefined;
+
+      if (offering.pricing_model === 'single') {
+        // Single pricing: use the one price
+        price = offering.prices[0]?.price;
+      } else {
+        // Multi-tier: find price for specific vehicle category
+        const categoryPrice = offering.prices.find(
+          (p: any) => p.vehicle_category_id === vehicleCategoryId
+        );
+        price = categoryPrice?.price;
+      }
+
+      if (price === undefined) {
+        throw new Error(`No price found for offering ${offering.id}`);
+      }
+
+      total += price;
+    }
+
+    return total;
+  } catch (err) {
+    console.error('Unexpected error in calculateOrderTotal:', err);
+    throw err;
+  }
+}
+
+/**
+ * Create an order with services (new service pricing system)
+ */
+export async function createOrderWithServices(
+  input: CreateOrderWithServicesData
+): Promise<OrderWithServices> {
+  // Verify authentication
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError) {
+    console.error('Auth error in createOrderWithServices:', authError);
+    throw new Error('You must be signed in to create an order');
+  }
+  if (!user) {
+    throw new Error('You must be signed in to create an order');
+  }
+
+  // Validate inputs
+  if (!input.vehicle_category_id) {
+    throw new Error('Vehicle category is required');
+  }
+  if (!input.service_offering_ids || input.service_offering_ids.length === 0) {
+    throw new Error('At least one service must be selected');
+  }
+
+  try {
+    // Calculate total price
+    const totalPrice = await calculateOrderTotal(
+      input.service_offering_ids,
+      input.vehicle_category_id
+    );
+
+    // Fetch service details for order_services records
+    const { data: offerings, error: offeringsError } = await supabase
+      .from('service_offerings')
+      .select(`
+        id,
+        pricing_model,
+        service:services(name),
+        prices:service_prices(vehicle_category_id, price)
+      `)
+      .in('id', input.service_offering_ids);
+
+    if (offeringsError || !offerings) {
+      throw new Error('Failed to fetch service details');
+    }
+
+    // Create the order
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .insert({
+        gig_id: input.dealer_id, // gig_id is required and references dealer_profiles
+        client_id: user.id,
+        dealer_id: input.dealer_id,
+        vehicle_category_id: input.vehicle_category_id,
+        total_price: totalPrice,
+        status: 'pending',
+        notes: input.notes || null,
+      })
+      .select()
+      .single();
+
+    if (orderError) {
+      console.error('Order creation error:', orderError);
+      throw new Error(`Failed to create order: ${orderError.message}`);
+    }
+
+    // Create order_services records
+    const orderServices = offerings.map((offering: any) => {
+      let price: number;
+
+      if (offering.pricing_model === 'single') {
+        price = offering.prices[0]?.price || 0;
+      } else {
+        const categoryPrice = offering.prices.find(
+          (p: any) => p.vehicle_category_id === input.vehicle_category_id
+        );
+        price = categoryPrice?.price || 0;
+      }
+
+      return {
+        order_id: order.id,
+        service_offering_id: offering.id,
+        service_name: offering.service.name,
+        price_at_order: price,
+      };
+    });
+
+    const { data: services, error: servicesError } = await supabase
+      .from('order_services')
+      .insert(orderServices)
+      .select();
+
+    if (servicesError) {
+      console.error('Error creating order services:', servicesError);
+      // Try to rollback by deleting the order
+      await supabase.from('orders').delete().eq('id', order.id);
+      throw new Error(`Failed to create order services: ${servicesError.message}`);
+    }
+
+    // Return complete order with services
+    return {
+      ...order,
+      services: services || [],
+    };
+  } catch (err) {
+    console.error('Unexpected error in createOrderWithServices:', err);
+    throw err;
+  }
+}
+
+/**
+ * Fetch order with services and vehicle category
+ */
+export async function fetchOrderWithServices(orderId: string): Promise<OrderWithServices | null> {
+  try {
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        vehicle_category:vehicle_categories(*),
+        services:order_services(*)
+      `)
+      .eq('id', orderId)
+      .single();
+
+    if (orderError) {
+      if (orderError.code === 'PGRST116') {
+        return null;
+      }
+      console.error('Error fetching order with services:', orderError);
+      throw new Error(`Failed to fetch order: ${orderError.message}`);
+    }
+
+    return order;
+  } catch (err) {
+    console.error('Unexpected error in fetchOrderWithServices:', err);
+    throw err;
+  }
+}
+
+/**
+ * Fetch all orders with services for a client
+ */
+export async function fetchClientOrdersWithServices(
+  clientId: string
+): Promise<OrderWithServices[]> {
+  try {
+    const { data, error } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        vehicle_category:vehicle_categories(*),
+        services:order_services(*)
+      `)
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching client orders with services:', error);
+      throw new Error(`Failed to fetch orders: ${error.message}`);
+    }
+
+    return data || [];
+  } catch (err) {
+    console.error('Unexpected error in fetchClientOrdersWithServices:', err);
+    throw err;
+  }
+}
+
+/**
+ * Fetch all orders with services for a dealer
+ */
+export async function fetchDealerOrdersWithServices(
+  dealerId: string
+): Promise<OrderWithServices[]> {
+  try {
+    const { data, error } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        vehicle_category:vehicle_categories(*),
+        services:order_services(*)
+      `)
+      .eq('dealer_id', dealerId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching dealer orders with services:', error);
+      throw new Error(`Failed to fetch orders: ${error.message}`);
+    }
+
+    return data || [];
+  } catch (err) {
+    console.error('Unexpected error in fetchDealerOrdersWithServices:', err);
+    throw err;
+  }
+}

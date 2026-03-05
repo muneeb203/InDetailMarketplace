@@ -223,7 +223,7 @@ function OrderCard({
   const config = statusConfig[order.status];
   const Icon = config.icon;
   const dealerName = order.dealer?.business_name || 'Dealer';
-  const price = order.agreed_price ?? order.proposed_price;
+  const price = order.total_price ?? order.agreed_price ?? order.proposed_price;
 
   return (
     <Card className="p-4">
@@ -231,8 +231,8 @@ function OrderCard({
         <div>
           <p className="font-medium text-gray-900">{dealerName}</p>
           <p className="text-sm text-gray-500">
-            Proposed: ${order.proposed_price}
-            {order.agreed_price != null && order.agreed_price !== order.proposed_price && (
+            Total: ${order.total_price ?? order.proposed_price}
+            {order.agreed_price != null && order.agreed_price !== (order.total_price ?? order.proposed_price) && (
               <> · Agreed: ${order.agreed_price}</>
             )}
           </p>

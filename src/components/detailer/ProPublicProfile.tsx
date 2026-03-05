@@ -8,7 +8,9 @@ import { useDealerProfile } from '../../hooks/useDealerProfile';
 import { fetchDealerSocialLinks, type SocialPlatform } from '../../services/dealerSocialService';
 import { getDealerCompletedOrdersCount } from '../../services/orderService';
 import { fetchDealerReviews, fetchDealerRating } from '../../services/dealerReviewService';
+import { getDetailerOfferings } from '../../services/serviceOfferingService';
 import type { Detailer } from '../../types';
+import type { ServiceOfferingWithPrices } from '../../types/serviceTypes';
 
 // Helper to get navigation functions (works with or without react-router)
 function useNav() {
@@ -44,8 +46,9 @@ export function ProPublicProfile({ onNavigate, detailer: detailerProp, onBack, o
   const [showGallery, setShowGallery] = useState(false);
   const [socialLinks, setSocialLinks] = useState<{ platform: SocialPlatform; url: string }[]>([]);
   const [completedJobs, setCompletedJobs] = useState<number>(0);
-  const [reviews, setReviews] = useState<{ id: string; rating: number; review_text: string | null; created_at: string; client_name: string }[]>([]);
+  const [reviews, setReviews] = useState<{ id: string; rating: number; review_text: string | null; created_at: string; client_name?: string }[]>([]);
   const [dealerRating, setDealerRating] = useState<{ rating: number; review_count: number } | null>(null);
+  const [serviceOfferings, setServiceOfferings] = useState<ServiceOfferingWithPrices[]>([]);
 
   useEffect(() => {
     if (dealerId) {
@@ -67,6 +70,7 @@ export function ProPublicProfile({ onNavigate, detailer: detailerProp, onBack, o
     if (dealerId) {
       fetchDealerReviews(dealerId).then(setReviews).catch(() => setReviews([]));
       fetchDealerRating(dealerId).then(setDealerRating).catch(() => setDealerRating(null));
+      getDetailerOfferings(dealerId).then(setServiceOfferings).catch(() => setServiceOfferings([]));
     }
   }, [dealerId]);
   
@@ -83,9 +87,11 @@ export function ProPublicProfile({ onNavigate, detailer: detailerProp, onBack, o
   const serviceRadius = isClientView
     ? (detailerProp!.serviceRadius ?? 10)
     : (dealerProfile?.service_radius_miles ?? (dealerProfile?.services_offered as { serviceRadius?: number })?.serviceRadius ?? 10);
-  const dealerServices = isClientView
-    ? (detailerProp!.services ?? detailerProp!.specialties ?? [])
-    : ((dealerProfile?.services_offered as { specialties?: string[] })?.specialties ?? []);
+  
+  // Get service names from active offerings for the service tags
+  const dealerServices = serviceOfferings
+    .filter(offering => offering.is_active)
+    .map(offering => offering.service.name);
 
   // Build BrandHeader-compatible object
   const detailer = isClientView ? {
@@ -140,13 +146,29 @@ export function ProPublicProfile({ onNavigate, detailer: detailerProp, onBack, o
   const yearsInBusiness = isClientView ? detailerProp!.yearsInBusiness : undefined;
   const certifications = isClientView ? detailerProp!.certifications : undefined;
 
-  const services = dealerServices.length > 0
-    ? dealerServices.map((name) => ({ name, price: 'Custom', time: '—' }))
-    : [
-        { name: 'Exterior Wash & Wax', price: 'From $89', time: '1-2 hours' },
-        { name: 'Interior Deep Clean', price: 'From $129', time: '2-3 hours' },
-        { name: 'Full Detail Package', price: 'From $249', time: '4-5 hours' },
-      ];
+  // Format services with pricing from service offerings
+  const formatPrice = (prices: any[], pricingModel: string) => {
+    if (!prices || prices.length === 0) return 'Custom';
+    
+    if (pricingModel === 'single') {
+      return `$${prices[0].price.toFixed(2)}`;
+    } else {
+      // Multi-tier: show price range
+      const priceValues = prices.map(p => p.price);
+      const minPrice = Math.min(...priceValues);
+      const maxPrice = Math.max(...priceValues);
+      return `$${minPrice.toFixed(2)} - $${maxPrice.toFixed(2)}`;
+    }
+  };
+
+  const services = serviceOfferings
+    .filter(offering => offering.is_active)
+    .map(offering => ({
+      name: offering.service.name,
+      description: offering.service.description,
+      price: formatPrice(offering.prices, offering.pricing_model),
+      pricingNote: offering.pricing_model === 'multi-tier' ? 'Varies by vehicle' : undefined
+    }));
 
   const handleSocialClick = (url: string) => {
     window.open(url, '_blank', 'noopener,noreferrer');
@@ -244,20 +266,32 @@ export function ProPublicProfile({ onNavigate, detailer: detailerProp, onBack, o
 
         {/* Services & Pricing */}
         <div className="bg-white rounded-2xl shadow-sm border p-6">
-          <h3 className="font-semibold text-lg text-gray-900 mb-4">Services & Starting Prices</h3>
-          <div className="space-y-3">
-            {services.map((service) => (
-              <div key={service.name} className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-br from-gray-50 to-white border border-gray-200">
-                <div>
-                  <div className="font-medium text-gray-900">{service.name}</div>
-                  <div className="text-sm text-gray-600">{service.time}</div>
+          <h3 className="font-semibold text-lg text-gray-900 mb-4">Services, pricing, and operating hours</h3>
+          {services.length > 0 ? (
+            <div className="space-y-3">
+              {services.map((service) => (
+                <div key={service.name} className="flex items-start justify-between p-4 rounded-xl bg-gradient-to-br from-gray-50 to-white border border-gray-200">
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-900">{service.name}</div>
+                    <div className="text-sm text-gray-600 mt-1">{service.description}</div>
+                    {service.pricingNote && (
+                      <div className="text-xs text-gray-500 mt-1">{service.pricingNote}</div>
+                    )}
+                  </div>
+                  <div className="text-right ml-4">
+                    <div className="font-semibold text-blue-600">{service.price}</div>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <div className="font-semibold text-blue-600">{service.price}</div>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <p className="mb-2">No services configured yet.</p>
+              {!isClientView && (
+                <p className="text-sm">Go to Settings → Services to add your services and pricing.</p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Reviews & Highlights - real client reviews only */}
@@ -276,7 +310,7 @@ export function ProPublicProfile({ onNavigate, detailer: detailerProp, onBack, o
               reviews.slice(0, 5).map((review) => (
                 <div key={review.id} className="p-4 rounded-xl bg-gradient-to-br from-gray-50 to-white border border-gray-200">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-gray-900">{review.client_name}</span>
+                    <span className="font-medium text-gray-900">{review.client_name ?? 'Anonymous'}</span>
                     <div className="flex gap-0.5">
                       {[1, 2, 3, 4, 5].map((star) => (
                         <Star

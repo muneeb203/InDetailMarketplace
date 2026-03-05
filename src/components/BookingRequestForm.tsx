@@ -4,14 +4,16 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Checkbox } from './ui/checkbox';
 import { Detailer, ServiceRequest } from '../types';
 import { ArrowLeft, DollarSign, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
-import { availableServices, vehicleTypes } from '../data/mockData';
 import { PhotoUpload } from './PhotoUpload';
 import { WaterSourceQuestion, WaterSourceAnswer } from './WaterSourceQuestion';
 import { InPersonEstimateToggle } from './InPersonEstimateToggle';
+import { VehicleCategorySelector } from './VehicleCategorySelector';
+import { ServiceSelectionList } from './ServiceSelectionList';
+import { OrderSummary } from './OrderSummary';
+import { createOrderWithServices } from '../services/orderService';
 
 interface BookingRequestFormProps {
   detailer?: Detailer;
@@ -20,9 +22,14 @@ interface BookingRequestFormProps {
 }
 
 export function BookingRequestForm({ detailer, onBack, onSubmit }: BookingRequestFormProps) {
+  const [vehicleCategoryId, setVehicleCategoryId] = useState<string | null>(null);
+  const [selectedServices, setSelectedServices] = useState<{
+    id: string;
+    name: string;
+    price: number;
+  }[]>([]);
+  
   const [formData, setFormData] = useState({
-    vehicleType: '',
-    services: [] as string[],
     preferredDate: '',
     preferredTime: '',
     location: '',
@@ -33,33 +40,54 @@ export function BookingRequestForm({ detailer, onBack, onSubmit }: BookingReques
   });
 
   const [showLeadCost, setShowLeadCost] = useState(false);
-
-  const handleServiceToggle = (service: string) => {
-    setFormData(prev => ({
-      ...prev,
-      services: prev.services.includes(service)
-        ? prev.services.filter(s => s !== service)
-        : [...prev.services, service]
-    }));
-  };
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setShowLeadCost(true);
   };
 
-  const handleConfirmRequest = () => {
-    const request: Partial<ServiceRequest> = {
-      ...formData,
-      status: 'pending',
-      createdAt: new Date()
-    };
-    onSubmit(request);
+  const handleConfirmRequest = async () => {
+    if (!detailer) {
+      alert('Detailer information is required');
+      return;
+    }
+
+    if (!vehicleCategoryId) {
+      alert('Please select a vehicle category');
+      return;
+    }
+
+    if (selectedServices.length === 0) {
+      alert('Please select at least one service');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await createOrderWithServices({
+        dealer_id: detailer.id,
+        vehicle_category_id: vehicleCategoryId,
+        service_offering_ids: selectedServices.map(s => s.id),
+        notes: formData.notes,
+      });
+      
+      // Call the existing onSubmit callback
+      onSubmit({
+        ...formData,
+        status: 'pending',
+        createdAt: new Date()
+      });
+    } catch (error) {
+      console.error('Error creating order:', error);
+      alert(error instanceof Error ? error.message : 'Failed to create order. Please try again.');
+      setIsSubmitting(false);
+    }
   };
 
   const servicesToShow = detailer 
     ? detailer.services 
-    : availableServices;
+    : [];
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -80,46 +108,37 @@ export function BookingRequestForm({ detailer, onBack, onSubmit }: BookingReques
       {/* Form */}
       <div className="flex-1 overflow-auto pb-24">
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Vehicle Type */}
-          <div className="space-y-2">
-            <Label htmlFor="vehicleType">Vehicle Type</Label>
-            <Select
-              value={formData.vehicleType}
-              onValueChange={(value) => setFormData({ ...formData, vehicleType: value })}
-              required
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select your vehicle type" />
-              </SelectTrigger>
-              <SelectContent>
-                {vehicleTypes.map(type => (
-                  <SelectItem key={type} value={type}>{type}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Vehicle Category */}
+          <VehicleCategorySelector
+            value={vehicleCategoryId}
+            onChange={setVehicleCategoryId}
+            required
+          />
 
-          {/* Services */}
-          <div className="space-y-3">
-            <Label>Services Needed</Label>
-            <div className="space-y-2">
-              {servicesToShow.map(service => (
-                <div key={service} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={service}
-                    checked={formData.services.includes(service)}
-                    onCheckedChange={() => handleServiceToggle(service)}
-                  />
-                  <label
-                    htmlFor={service}
-                    className="text-sm cursor-pointer flex-1"
-                  >
-                    {service}
-                  </label>
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* Services with Pricing */}
+          {detailer && (
+            <ServiceSelectionList
+              dealerId={detailer.id}
+              vehicleCategoryId={vehicleCategoryId}
+              selectedOfferingIds={selectedServices.map(s => s.id)}
+              onToggleOffering={(id, price, name) => {
+                const existingService = selectedServices.find(s => s.id === id);
+                
+                if (existingService) {
+                  // Remove service
+                  setSelectedServices(prev => prev.filter(s => s.id !== id));
+                } else {
+                  // Add service
+                  setSelectedServices(prev => [...prev, { id, name, price }]);
+                }
+              }}
+            />
+          )}
+
+          {/* Order Summary */}
+          {selectedServices.length > 0 && (
+            <OrderSummary items={selectedServices} />
+          )}
 
           {/* Date & Time */}
           <div className="grid grid-cols-2 gap-4">
@@ -231,10 +250,10 @@ export function BookingRequestForm({ detailer, onBack, onSubmit }: BookingReques
           <Button
             type="submit"
             onClick={handleSubmit}
-            disabled={formData.services.length === 0 || !formData.vehicleType}
+            disabled={selectedServices.length === 0 || !vehicleCategoryId || isSubmitting}
             className="w-full bg-blue-600 hover:bg-blue-700"
           >
-            Submit Request
+            {isSubmitting ? 'Submitting...' : 'Submit Request'}
           </Button>
         </div>
       </div>
@@ -259,12 +278,14 @@ export function BookingRequestForm({ detailer, onBack, onSubmit }: BookingReques
             <div className="bg-gray-50 rounded-lg p-4 mb-6">
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Vehicle:</span>
-                  <span>{formData.vehicleType}</span>
+                  <span className="text-gray-600">Services:</span>
+                  <span>{selectedServices.length}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Services:</span>
-                  <span>{formData.services.length}</span>
+                  <span className="text-gray-600">Total:</span>
+                  <span className="font-semibold">
+                    ${selectedServices.reduce((sum, s) => sum + s.price, 0).toFixed(2)}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Date:</span>
@@ -278,14 +299,16 @@ export function BookingRequestForm({ detailer, onBack, onSubmit }: BookingReques
                 variant="outline"
                 onClick={() => setShowLeadCost(false)}
                 className="flex-1"
+                disabled={isSubmitting}
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleConfirmRequest}
                 className="flex-1 bg-blue-600 hover:bg-blue-700"
+                disabled={isSubmitting}
               >
-                Confirm
+                {isSubmitting ? 'Creating...' : 'Confirm'}
               </Button>
             </div>
           </div>

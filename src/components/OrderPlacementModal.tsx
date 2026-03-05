@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Detailer } from '../types';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import {
@@ -12,7 +11,10 @@ import {
   DialogFooter,
   DialogDescription,
 } from './ui/dialog';
-import { DollarSign, Calendar } from 'lucide-react';
+import { VehicleCategorySelector } from './VehicleCategorySelector';
+import { ServiceSelectionList } from './ServiceSelectionList';
+import { OrderSummary } from './OrderSummary';
+import { createOrderWithServices } from '../services/orderService';
 
 interface OrderPlacementModalProps {
   open: boolean;
@@ -31,18 +33,29 @@ export function OrderPlacementModal({
   onSuccess,
   onError,
 }: OrderPlacementModalProps) {
-  const [proposedPrice, setProposedPrice] = useState('');
+  const [vehicleCategoryId, setVehicleCategoryId] = useState<string | null>(null);
+  const [selectedServices, setSelectedServices] = useState<{
+    id: string;
+    name: string;
+    price: number;
+  }[]>([]);
   const [notes, setNotes] = useState('');
   const [scheduledDate, setScheduledDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const price = parseFloat(proposedPrice);
-    if (!price || price <= 0) {
-      onError('Proposed price must be greater than 0');
+    
+    if (!vehicleCategoryId) {
+      onError('Please select a vehicle category');
       return;
     }
+    
+    if (selectedServices.length === 0) {
+      onError('Please select at least one service');
+      return;
+    }
+    
     if (detailer.id === clientId) {
       onError('You cannot request service from yourself');
       return;
@@ -50,20 +63,19 @@ export function OrderPlacementModal({
 
     setSubmitting(true);
     try {
-      const { createOrder } = await import('../services/orderService');
-      const order = await createOrder(
-        {
-          gig_id: detailer.id,
-          dealer_id: detailer.id,
-          proposed_price: price,
-          notes: notes.trim() || undefined,
-          scheduled_date: scheduledDate || undefined,
-        },
-        clientId
-      );
+      const order = await createOrderWithServices({
+        dealer_id: detailer.id,
+        vehicle_category_id: vehicleCategoryId,
+        service_offering_ids: selectedServices.map(s => s.id),
+        notes: notes.trim() || undefined,
+      });
+      
       onSuccess(order.id);
       onOpenChange(false);
-      setProposedPrice('');
+      
+      // Reset form
+      setVehicleCategoryId(null);
+      setSelectedServices([]);
       setNotes('');
       setScheduledDate('');
     } catch (err: unknown) {
@@ -74,50 +86,63 @@ export function OrderPlacementModal({
     }
   };
 
+  const handleToggleService = (id: string, price: number, name: string) => {
+    const existingService = selectedServices.find(s => s.id === id);
+    
+    if (existingService) {
+      // Remove service
+      setSelectedServices(prev => prev.filter(s => s.id !== id));
+    } else {
+      // Add service
+      setSelectedServices(prev => [...prev, { id, name, price }]);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Request Service</DialogTitle>
           <DialogDescription>
-            Request service from {detailer.businessName}. Enter your proposed price and any details.
+            Request service from {detailer.businessName}. Select your vehicle type and services.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Vehicle Category */}
+          <VehicleCategorySelector
+            value={vehicleCategoryId}
+            onChange={setVehicleCategoryId}
+            required
+          />
+
+          {/* Services with Pricing */}
+          <ServiceSelectionList
+            dealerId={detailer.id}
+            vehicleCategoryId={vehicleCategoryId}
+            selectedOfferingIds={selectedServices.map(s => s.id)}
+            onToggleOffering={handleToggleService}
+          />
+
+          {/* Order Summary */}
+          {selectedServices.length > 0 && (
+            <OrderSummary items={selectedServices} />
+          )}
+
+          {/* Scheduled Date */}
           <div className="space-y-2">
-            <Label htmlFor="proposed_price">Proposed Price ($) *</Label>
-            <div className="relative">
-              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                id="proposed_price"
-                type="number"
-                min="0.01"
-                step="0.01"
-                placeholder="0.00"
-                value={proposedPrice}
-                onChange={(e) => setProposedPrice(e.target.value)}
-                className="pl-9"
-                required
-              />
-            </div>
+            <Label htmlFor="scheduled_date">Preferred Date (optional)</Label>
+            <input
+              id="scheduled_date"
+              type="date"
+              min={new Date().toISOString().split('T')[0]}
+              value={scheduledDate}
+              onChange={(e) => setScheduledDate(e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="scheduled_date">Scheduled Date (optional)</Label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                id="scheduled_date"
-                type="date"
-                min={new Date().toISOString().split('T')[0]}
-                value={scheduledDate}
-                onChange={(e) => setScheduledDate(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-          </div>
-
+          {/* Notes */}
           <div className="space-y-2">
             <Label htmlFor="notes">Notes (optional)</Label>
             <Textarea
@@ -139,8 +164,11 @@ export function OrderPlacementModal({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? 'Submitting...' : 'Confirm'}
+            <Button 
+              type="submit" 
+              disabled={submitting || selectedServices.length === 0 || !vehicleCategoryId}
+            >
+              {submitting ? 'Submitting...' : 'Confirm Request'}
             </Button>
           </DialogFooter>
         </form>
@@ -148,3 +176,4 @@ export function OrderPlacementModal({
     </Dialog>
   );
 }
+
