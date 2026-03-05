@@ -417,7 +417,7 @@ export function ClientJobStatusPage({
               <div className="flex items-center justify-between">
                 <span className="text-sm">Total</span>
                 <span className="text-base text-gray-900">
-                  ${order.agreed_price ?? order.proposed_price}
+                  ${order.total_price ?? order.agreed_price ?? order.proposed_price}
                 </span>
               </div>
             </div>

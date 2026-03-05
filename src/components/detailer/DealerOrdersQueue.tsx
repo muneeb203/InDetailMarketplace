@@ -74,7 +74,7 @@ export function DealerOrdersQueue({ dealerId, onNavigate }: DealerOrdersQueuePro
       setNewOrderIds((prev) => new Set(prev).add(order.id));
       setPendingCount((c) => c + 1);
       toast.success('New service request', {
-        description: `Order from ${order.client?.name ?? 'a client'} — $${order.proposed_price}`,
+        description: `Order from ${order.client?.name ?? 'a client'} — $${order.total_price ?? order.proposed_price}`,
         duration: 5000,
       });
     }
@@ -331,7 +331,7 @@ function DealerOrderCard({
     setUpdatingId(order.id);
     try {
       const updated = await updateOrderStatus(order.id, 'accepted', {
-        agreed_price: order.proposed_price,
+        agreed_price: order.total_price ?? order.proposed_price,
       });
       mergeOrder(updated);
       toast.success('Order accepted');
@@ -418,7 +418,7 @@ function DealerOrderCard({
     }
   };
 
-  const price = order.agreed_price ?? order.proposed_price;
+  const price = order.total_price ?? order.agreed_price ?? order.proposed_price;
 
   return (
     <Card
@@ -429,8 +429,8 @@ function DealerOrderCard({
         <div>
           <p className="font-medium text-gray-900">{clientName}</p>
           <p className="text-sm text-gray-500">
-            Proposed: ${order.proposed_price}
-            {order.agreed_price != null && order.agreed_price !== order.proposed_price && (
+            Total: ${order.total_price ?? order.proposed_price}
+            {order.agreed_price != null && order.agreed_price !== (order.total_price ?? order.proposed_price) && (
               <> · Agreed: ${order.agreed_price}</>
             )}
           </p>

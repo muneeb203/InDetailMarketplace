@@ -42,7 +42,7 @@ function mapOrderToBookingItem(order: Order, role: 'client' | 'detailer'): Booki
   };
   const status = statusMap[order.status] ?? 'accepted';
   const serviceType = order.notes?.slice(0, 50) ?? 'Detailing Service';
-  const price = order.agreed_price ?? order.proposed_price;
+  const price = order.total_price ?? order.agreed_price ?? order.proposed_price;
   const clientOrDetailerName =
     role === 'detailer'
       ? (order.client?.name ?? 'Client')

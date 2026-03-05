@@ -13,6 +13,7 @@ import {
   BarChart3,
   Share2,
   Percent,
+  Wrench,
 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useDealerProfile } from '../../../hooks/useDealerProfile';
@@ -23,6 +24,7 @@ import { BusinessDetailsSection } from './BusinessDetailsSection';
 import { AccountSecuritySection } from './AccountSecuritySection';
 import { SocialProfilesSection } from './SocialProfilesSection';
 import { PromotionsSection } from './PromotionsSection';
+import { ServiceConfigurationPanel } from '../../ServiceConfigurationPanel';
 
 interface DealerSettingsProps {
   onNavigate?: (view: string) => void;
@@ -34,6 +36,7 @@ const TAB_MAP: Record<string, string> = {
   portfolio: 'portfolio',
   location: 'location',
   business: 'business',
+  services: 'services',
   social: 'social',
   promotions: 'promotions',
   promo: 'promotions',
@@ -115,7 +118,7 @@ export function DealerSettings({ onNavigate, initialTab }: DealerSettingsProps) 
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-1 h-auto flex-wrap p-1 bg-gray-100 rounded-xl">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-1 h-auto flex-wrap p-1 bg-gray-100 rounded-xl">
           <TabsTrigger value="profile" className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <User className="w-4 h-4" />
             Profile
@@ -131,6 +134,10 @@ export function DealerSettings({ onNavigate, initialTab }: DealerSettingsProps) 
           <TabsTrigger value="business" className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <Briefcase className="w-4 h-4" />
             Business
+          </TabsTrigger>
+          <TabsTrigger value="services" className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+            <Wrench className="w-4 h-4" />
+            Services
           </TabsTrigger>
           <TabsTrigger value="social" className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <Share2 className="w-4 h-4" />
@@ -163,6 +170,10 @@ export function DealerSettings({ onNavigate, initialTab }: DealerSettingsProps) 
 
         <TabsContent value="business" className="mt-6">
           <BusinessDetailsSection userId={userId!} data={data} onUpdate={updateLocal} />
+        </TabsContent>
+
+        <TabsContent value="services" className="mt-6">
+          <ServiceConfigurationPanel dealerId={userId!} mode="settings" />
         </TabsContent>
 
         <TabsContent value="social" className="mt-6">
