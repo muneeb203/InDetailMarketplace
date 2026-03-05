@@ -31,7 +31,7 @@ interface ProPublicProfileProps {
   /** When provided (client viewing a gig), use this detailer's data and show client CTAs */
   detailer?: Detailer;
   onBack?: () => void;
-  onRequestQuote?: () => void;
+  onRequestQuote?: (selectedServices: { id: string; name: string }[]) => void;
   onMessage?: () => void;
 }
 
@@ -49,6 +49,7 @@ export function ProPublicProfile({ onNavigate, detailer: detailerProp, onBack, o
   const [reviews, setReviews] = useState<{ id: string; rating: number; review_text: string | null; created_at: string; client_name?: string }[]>([]);
   const [dealerRating, setDealerRating] = useState<{ rating: number; review_count: number } | null>(null);
   const [serviceOfferings, setServiceOfferings] = useState<ServiceOfferingWithPrices[]>([]);
+  const [selectedOfferingIds, setSelectedOfferingIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (dealerId) {
@@ -164,11 +165,22 @@ export function ProPublicProfile({ onNavigate, detailer: detailerProp, onBack, o
   const services = serviceOfferings
     .filter(offering => offering.is_active)
     .map(offering => ({
+      id: offering.id,
       name: offering.service.name,
       description: offering.service.description,
       price: formatPrice(offering.prices, offering.pricing_model),
       pricingNote: offering.pricing_model === 'multi-tier' ? 'Varies by vehicle' : undefined
     }));
+
+  const toggleServiceSelection = (offeringId: string) => {
+    setSelectedOfferingIds((prev) => {
+      if (prev.includes(offeringId)) {
+        return prev.filter((id) => id !== offeringId);
+      }
+      if (prev.length >= 2) return prev;
+      return [...prev, offeringId];
+    });
+  };
 
   const handleSocialClick = (url: string) => {
     window.open(url, '_blank', 'noopener,noreferrer');
@@ -269,8 +281,22 @@ export function ProPublicProfile({ onNavigate, detailer: detailerProp, onBack, o
           <h3 className="font-semibold text-lg text-gray-900 mb-4">Services, pricing, and operating hours</h3>
           {services.length > 0 ? (
             <div className="space-y-3">
-              {services.map((service) => (
-                <div key={service.name} className="flex items-start justify-between p-4 rounded-xl bg-gradient-to-br from-gray-50 to-white border border-gray-200">
+              {services.map((service) => {
+                const isSelected = selectedOfferingIds.includes(service.id);
+                return (
+                <button
+                  type="button"
+                  key={service.id}
+                  onClick={() => isClientView && toggleServiceSelection(service.id)}
+                  className={`w-full text-left flex items-start justify-between p-4 rounded-xl bg-gradient-to-br border transition ${
+                    isClientView
+                      ? isSelected
+                        ? 'from-blue-50 to-white border-blue-300 ring-1 ring-blue-200'
+                        : 'from-gray-50 to-white border-gray-200 hover:border-blue-300'
+                      : 'from-gray-50 to-white border-gray-200 cursor-default'
+                  }`}
+                  disabled={!isClientView}
+                >
                   <div className="flex-1">
                     <div className="font-medium text-gray-900">{service.name}</div>
                     <div className="text-sm text-gray-600 mt-1">{service.description}</div>
@@ -280,9 +306,14 @@ export function ProPublicProfile({ onNavigate, detailer: detailerProp, onBack, o
                   </div>
                   <div className="text-right ml-4">
                     <div className="font-semibold text-blue-600">{service.price}</div>
+                    {isClientView && (
+                      <div className={`mt-1 text-xs ${isSelected ? 'text-blue-700' : 'text-gray-500'}`}>
+                        {isSelected ? 'Selected' : 'Tap to select'}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                </button>
+              )})}
             </div>
           ) : (
             <div className="text-center py-8 text-gray-500">
@@ -291,6 +322,11 @@ export function ProPublicProfile({ onNavigate, detailer: detailerProp, onBack, o
                 <p className="text-sm">Go to Settings → Services to add your services and pricing.</p>
               )}
             </div>
+          )}
+          {isClientView && services.length > 0 && (
+            <p className="text-xs text-gray-500 mt-3">
+              Select 1 or 2 services, then tap Request Quote.
+            </p>
           )}
         </div>
 
@@ -370,8 +406,15 @@ export function ProPublicProfile({ onNavigate, detailer: detailerProp, onBack, o
           {isClientView && onRequestQuote && onMessage ? (
             <>
               <button
-                onClick={onRequestQuote}
-                className="flex-1 h-14 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-lg hover:from-blue-700 hover:to-blue-800 transition-all active:scale-95 shadow-lg"
+                onClick={() =>
+                  onRequestQuote(
+                    services
+                      .filter((service) => selectedOfferingIds.includes(service.id))
+                      .map((service) => ({ id: service.id, name: service.name }))
+                  )
+                }
+                disabled={selectedOfferingIds.length === 0}
+                className="flex-1 h-14 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-lg hover:from-blue-700 hover:to-blue-800 transition-all active:scale-95 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Request Quote
               </button>

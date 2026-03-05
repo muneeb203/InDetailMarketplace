@@ -99,6 +99,7 @@ export default function AppRoleAware() {
   const [viewingConversationId, setViewingConversationId] = useState<string | null>(null);
   const [proNavParams, setProNavParams] = useState<any>({});
   const [orderModalOpen, setOrderModalOpen] = useState(false);
+  const [preselectedServices, setPreselectedServices] = useState<{ id: string; name: string }[]>([]);
   
   // Dealer name search with 300ms debounce
   const [dealerSearchQuery, setDealerSearchQuery] = useState('');
@@ -1038,7 +1039,8 @@ export default function AppRoleAware() {
         <ProPublicProfile
           detailer={displayDetailers.find(d => d.id === selectedDetailerId) || displayDetailers[0]}
           onBack={() => setCurrentView("marketplace")}
-          onRequestQuote={() => {
+          onRequestQuote={(selectedServices: { id: string; name: string }[]) => {
+            setPreselectedServices(selectedServices);
             if (currentUser.role === "client") {
               setOrderModalOpen(true);
             } else {
@@ -1059,9 +1061,14 @@ export default function AppRoleAware() {
       {currentUser.role === "client" && selectedDetailerId && (
         <OrderPlacementModal
           open={orderModalOpen}
-          onOpenChange={setOrderModalOpen}
+          onOpenChange={(open) => {
+            setOrderModalOpen(open);
+            if (!open) setPreselectedServices([]);
+          }}
           detailer={displayDetailers.find(d => d.id === selectedDetailerId) || displayDetailers[0]}
           clientId={currentUser.id}
+          clientVehicles={(currentUser as Customer).vehicles ?? []}
+          initialSelectedServices={preselectedServices}
           onSuccess={() => {
             toast.success("Order placed successfully!");
             setCurrentView("my-orders");

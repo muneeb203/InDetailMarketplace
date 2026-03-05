@@ -1,13 +1,16 @@
+import { useEffect } from 'react';
 import { Card, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
 import { useServiceOfferings } from '../hooks/useServiceOfferings';
+import type { ServiceOfferingWithPrice } from '../types/serviceTypes';
 
 interface ServiceSelectionListProps {
   dealerId: string;
   vehicleCategoryId: string | null;
   selectedOfferingIds: string[];
   onToggleOffering: (offeringId: string, price: number, serviceName: string) => void;
+  onOfferingsLoaded?: (offerings: ServiceOfferingWithPrice[]) => void;
   disabled?: boolean;
 }
 
@@ -16,9 +19,14 @@ export function ServiceSelectionList({
   vehicleCategoryId,
   selectedOfferingIds,
   onToggleOffering,
+  onOfferingsLoaded,
   disabled = false,
 }: ServiceSelectionListProps) {
   const { offerings, loading, error } = useServiceOfferings(dealerId, vehicleCategoryId);
+
+  useEffect(() => {
+    onOfferingsLoaded?.(offerings);
+  }, [offerings, onOfferingsLoaded]);
 
   const formatPrice = (price: number): string => {
     return new Intl.NumberFormat('en-US', {
