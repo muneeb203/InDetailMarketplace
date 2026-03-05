@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient';
 import type { Order, OrderStatus } from '../types';
+import { createNotification } from './notificationService';
 
 const ALLOWED_CLIENT_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
   pending: ['rejected'],
@@ -69,6 +70,8 @@ export async function createOrder(input: CreateOrderInput, clientId: string): Pr
     console.error('Order creation error:', error);
     throw error;
   }
+  // Fire-and-forget dealer notification for new quote request
+  notifyDealerOfQuoteRequest(data.dealer_id as string, user.id, Number(data.proposed_price ?? 0), data.id as string);
   return mapRowToOrder(data);
 }
 
@@ -566,6 +569,9 @@ export async function createOrderWithServices(
       throw new Error(`Failed to create order services: ${servicesError.message}`);
     }
 
+    // Fire-and-forget dealer notification for new quote request
+    notifyDealerOfQuoteRequest(order.dealer_id as string, user.id, Number(order.total_price ?? totalPrice), order.id as string);
+
     // Return complete order with services
     return {
       ...order,
@@ -574,6 +580,33 @@ export async function createOrderWithServices(
   } catch (err) {
     console.error('Unexpected error in createOrderWithServices:', err);
     throw err;
+  }
+}
+
+async function notifyDealerOfQuoteRequest(
+  dealerId: string,
+  clientId: string,
+  totalPrice: number,
+  orderId: string
+): Promise<void> {
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('name')
+      .eq('id', clientId)
+      .maybeSingle();
+
+    const clientName = profile?.name || 'A client';
+    await createNotification(
+      dealerId,
+      'order',
+      'New quote request',
+      `${clientName} requested a quote${totalPrice > 0 ? ` for $${totalPrice.toFixed(2)}` : ''}.`,
+      '/orders-queue'
+    );
+  } catch (err) {
+    // Never block order creation if notification write fails.
+    console.error('Failed to create dealer quote notification:', err);
   }
 }
 

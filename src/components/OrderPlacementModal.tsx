@@ -94,7 +94,6 @@ export function OrderPlacementModal({
     if (initialSelectedServices.length === 0) return [];
     return offerings
       .filter((offering) => initialSelectedServices.some((s) => s.id === offering.id))
-      .slice(0, 2)
       .map((offering) => ({
         id: offering.id,
         name: offering.service.name,

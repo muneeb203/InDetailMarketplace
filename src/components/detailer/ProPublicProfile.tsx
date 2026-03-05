@@ -177,7 +177,6 @@ export function ProPublicProfile({ onNavigate, detailer: detailerProp, onBack, o
       if (prev.includes(offeringId)) {
         return prev.filter((id) => id !== offeringId);
       }
-      if (prev.length >= 2) return prev;
       return [...prev, offeringId];
     });
   };
@@ -325,7 +324,7 @@ export function ProPublicProfile({ onNavigate, detailer: detailerProp, onBack, o
           )}
           {isClientView && services.length > 0 && (
             <p className="text-xs text-gray-500 mt-3">
-              Select 1 or 2 services, then tap Request Quote.
+              Select one or more services, then tap Request Quote.
             </p>
           )}
         </div>
