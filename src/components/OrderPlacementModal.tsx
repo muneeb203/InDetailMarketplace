@@ -22,6 +22,7 @@ import {
 import { createOrderWithServices } from '../services/orderService';
 import { useVehicleCategories } from '../hooks/useVehicleCategories';
 import { useServiceOfferings } from '../hooks/useServiceOfferings';
+import { StripeCheckout } from './StripeCheckout';
 
 interface OrderPlacementModalProps {
   open: boolean;
@@ -53,6 +54,7 @@ export function OrderPlacementModal({
   const [promoApplied, setPromoApplied] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
   const [submitting, setSubmitting] = useState(false);
+  const [showStripeCheckout, setShowStripeCheckout] = useState(false);
 
   const mapVehicleToCategoryId = (vehicle: Vehicle): string | null => {
     if (!vehicle.type) return null;
@@ -109,6 +111,21 @@ export function OrderPlacementModal({
     [resolvedSelectedServices, initialSelectedServices]
   );
 
+  const isLoadingPrices = initialSelectedServices.length > 0 && resolvedSelectedServices.length === 0 && vehicleCategoryId !== null;
+
+  // Debug logging
+  useEffect(() => {
+    console.log('OrderPlacementModal Debug:', {
+      vehicleCategoryId,
+      offeringsCount: offerings.length,
+      initialSelectedServicesCount: initialSelectedServices.length,
+      offerings: offerings.map(o => ({ id: o.id, name: o.service.name, price: o.price })),
+      initialSelectedServices,
+      resolvedCount: resolvedSelectedServices.length,
+      resolved: resolvedSelectedServices,
+    });
+  }, [vehicleCategoryId, offerings, initialSelectedServices, resolvedSelectedServices]);
+
   const subTotal = resolvedSelectedServices.reduce((sum, s) => sum + s.price, 0);
   const discount = promoApplied && promoCode.trim().toUpperCase() === 'SAVE10' ? subTotal * 0.1 : 0;
   const total = Math.max(0, subTotal - discount);
@@ -139,6 +156,12 @@ export function OrderPlacementModal({
       return;
     }
 
+    // Show Stripe checkout instead of submitting immediately
+    if (paymentMethod === 'card' && !showStripeCheckout) {
+      setShowStripeCheckout(true);
+      return;
+    }
+
     setSubmitting(true);
     try {
       const paymentMeta = `Payment: ${paymentMethod} | subtotal=${subTotal.toFixed(2)} | discount=${discount.toFixed(2)} | total=${total.toFixed(2)}${promoApplied ? ` | promo=${promoCode.trim().toUpperCase()}` : ''}`;
@@ -157,6 +180,36 @@ export function OrderPlacementModal({
       setPromoApplied(false);
       setNotes('');
       setPaymentMethod('card');
+      setShowStripeCheckout(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to create order';
+      onError(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleStripeSuccess = async () => {
+    // After successful Stripe payment, create the order
+    setSubmitting(true);
+    try {
+      const paymentMeta = `Payment: card (Stripe) | subtotal=${subTotal.toFixed(2)} | discount=${discount.toFixed(2)} | total=${total.toFixed(2)}${promoApplied ? ` | promo=${promoCode.trim().toUpperCase()}` : ''}`;
+      const mergedNotes = [paymentMeta, notes.trim()].filter(Boolean).join('\n');
+
+      const order = await createOrderWithServices({
+        dealer_id: detailer.id,
+        vehicle_category_id: vehicleCategoryId!,
+        service_offering_ids: resolvedSelectedServices.map((s) => s.id),
+        notes: mergedNotes || undefined,
+      });
+
+      onSuccess(order.id);
+      onOpenChange(false);
+      setPromoCode('');
+      setPromoApplied(false);
+      setNotes('');
+      setPaymentMethod('card');
+      setShowStripeCheckout(false);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to create order';
       onError(msg);
@@ -176,97 +229,108 @@ export function OrderPlacementModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="rounded-lg border p-3 bg-gray-50">
-            <p className="text-sm font-medium mb-2">Selected Services</p>
-            {selectedServicesForDisplay.length > 0 ? (
-              <div className="space-y-1.5">
-                {selectedServicesForDisplay.map((s) => (
-                  <div key={s.id} className="flex items-center justify-between text-sm">
-                    <span>{s.name}</span>
-                    <span className="font-medium">
-                      {s.hasPrice ? `$${s.price.toFixed(2)}` : 'Selected'}
-                    </span>
+          {!showStripeCheckout ? (
+            <>
+              <div className="rounded-lg border p-3 bg-gray-50">
+                <p className="text-sm font-medium mb-2">Selected Services</p>
+                {selectedServicesForDisplay.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {selectedServicesForDisplay.map((s) => (
+                      <div key={s.id} className="flex items-center justify-between text-sm">
+                        <span>{s.name}</span>
+                        <span className="font-medium">
+                          {isLoadingPrices ? 'Loading...' : s.hasPrice ? `$${s.price.toFixed(2)}` : 'Selected'}
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                ) : (
+                  <p className="text-sm text-gray-500">No services selected on gig page.</p>
+                )}
               </div>
-            ) : (
-              <p className="text-sm text-gray-500">No services selected on gig page.</p>
-            )}
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="promo">Promo Code</Label>
-            <div className="flex gap-2">
-              <Input
-                id="promo"
-                value={promoCode}
-                onChange={(e) => {
-                  setPromoCode(e.target.value);
-                  setPromoApplied(false);
-                }}
-                placeholder="Enter code (e.g. SAVE10)"
-              />
-              <Button type="button" variant="outline" onClick={applyPromo}>
-                Apply
-              </Button>
-            </div>
-            {promoApplied && (
-              <p className="text-xs text-green-600">Promo applied: 10% off</p>
-            )}
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="promo">Promo Code</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="promo"
+                    value={promoCode}
+                    onChange={(e) => {
+                      setPromoCode(e.target.value);
+                      setPromoApplied(false);
+                    }}
+                    placeholder="Enter code (e.g. SAVE10)"
+                  />
+                  <Button type="button" variant="outline" onClick={applyPromo}>
+                    Apply
+                  </Button>
+                </div>
+                {promoApplied && (
+                  <p className="text-xs text-green-600">Promo applied: 10% off</p>
+                )}
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="payment-method">Payment Method</Label>
-            <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as PaymentMethod)}>
-              <SelectTrigger id="payment-method" className="w-full">
-                <SelectValue placeholder="Select payment method" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="card">Credit / Debit Card</SelectItem>
-                <SelectItem value="wallet">Wallet / UPI</SelectItem>
-                <SelectItem value="cash">Cash on service</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="payment-method">Payment Method</Label>
+                <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as PaymentMethod)}>
+                  <SelectTrigger id="payment-method" className="w-full">
+                    <SelectValue placeholder="Select payment method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="card">Credit / Debit Card</SelectItem>
+                    <SelectItem value="wallet">Wallet / UPI</SelectItem>
+                    <SelectItem value="cash">Cash on service</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="rounded-lg border p-3 space-y-1.5">
-            <div className="flex items-center justify-between text-sm">
-              <span>Subtotal</span>
-              <span>${subTotal.toFixed(2)}</span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span>Discount</span>
-              <span>- ${discount.toFixed(2)}</span>
-            </div>
-            <div className="flex items-center justify-between font-semibold pt-1 border-t">
-              <span>Total Payment</span>
-              <span>${total.toFixed(2)}</span>
-            </div>
-          </div>
+              <div className="rounded-lg border p-3 space-y-1.5">
+                <div className="flex items-center justify-between text-sm">
+                  <span>Subtotal</span>
+                  <span>${subTotal.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span>Discount</span>
+                  <span>- ${discount.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between font-semibold pt-1 border-t">
+                  <span>Total Payment</span>
+                  <span>${total.toFixed(2)}</span>
+                </div>
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes (optional)</Label>
-            <Textarea
-              id="notes"
-              placeholder="Any special requests..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-              className="resize-none"
+              <div className="space-y-2">
+                <Label htmlFor="notes">Notes (optional)</Label>
+                <Textarea
+                  id="notes"
+                  placeholder="Any special requests..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={3}
+                  className="resize-none"
+                />
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={submitting || resolvedSelectedServices.length === 0 || !vehicleCategoryId}
+                >
+                  {submitting ? 'Processing...' : paymentMethod === 'card' ? 'Proceed to Pay' : `Pay $${total.toFixed(2)} & Request Quote`}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <StripeCheckout
+              amount={total}
+              onSuccess={handleStripeSuccess}
+              onCancel={() => setShowStripeCheckout(false)}
+              onError={onError}
             />
-          </div>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={submitting || resolvedSelectedServices.length === 0 || !vehicleCategoryId}
-            >
-              {submitting ? 'Processing...' : `Pay $${total.toFixed(2)} & Request Quote`}
-            </Button>
-          </DialogFooter>
+          )}
         </form>
       </DialogContent>
     </Dialog>
