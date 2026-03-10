@@ -31,7 +31,7 @@ interface ProPublicProfileProps {
   /** When provided (client viewing a gig), use this detailer's data and show client CTAs */
   detailer?: Detailer;
   onBack?: () => void;
-  onRequestQuote?: (selectedServices: { id: string; name: string }[]) => void;
+  onRequestQuote?: (selectedServices: { id: string; name: string; price: number }[]) => void;
   onMessage?: () => void;
 }
 
@@ -160,6 +160,13 @@ export function ProPublicProfile({ onNavigate, detailer: detailerProp, onBack, o
       const maxPrice = Math.max(...priceValues);
       return `$${minPrice.toFixed(2)} - $${maxPrice.toFixed(2)}`;
     }
+  };
+
+  /** Numeric price for checkout: single = first price; multi-tier = min price */
+  const getNumericPrice = (offering: ServiceOfferingWithPrices): number => {
+    if (!offering.prices || offering.prices.length === 0) return 0;
+    if (offering.pricing_model === 'single') return offering.prices[0].price;
+    return Math.min(...offering.prices.map((p) => p.price));
   };
 
   const services = serviceOfferings
@@ -405,13 +412,16 @@ export function ProPublicProfile({ onNavigate, detailer: detailerProp, onBack, o
           {isClientView && onRequestQuote && onMessage ? (
             <>
               <button
-                onClick={() =>
-                  onRequestQuote(
-                    services
-                      .filter((service) => selectedOfferingIds.includes(service.id))
-                      .map((service) => ({ id: service.id, name: service.name }))
-                  )
-                }
+                onClick={() => {
+                  const selected = serviceOfferings
+                    .filter((o) => o.is_active && selectedOfferingIds.includes(o.id))
+                    .map((o) => ({
+                      id: o.id,
+                      name: o.service.name,
+                      price: getNumericPrice(o),
+                    }));
+                  onRequestQuote(selected);
+                }}
                 disabled={selectedOfferingIds.length === 0}
                 className="flex-1 h-14 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-lg hover:from-blue-700 hover:to-blue-800 transition-all active:scale-95 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >

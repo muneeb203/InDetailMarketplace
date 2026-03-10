@@ -99,7 +99,7 @@ export default function AppRoleAware() {
   const [viewingConversationId, setViewingConversationId] = useState<string | null>(null);
   const [proNavParams, setProNavParams] = useState<any>({});
   const [orderModalOpen, setOrderModalOpen] = useState(false);
-  const [preselectedServices, setPreselectedServices] = useState<{ id: string; name: string }[]>([]);
+  const [preselectedServices, setPreselectedServices] = useState<{ id: string; name: string; price: number }[]>([]);
   
   // Dealer name search with 300ms debounce
   const [dealerSearchQuery, setDealerSearchQuery] = useState('');
@@ -1039,7 +1039,7 @@ export default function AppRoleAware() {
         <ProPublicProfile
           detailer={displayDetailers.find(d => d.id === selectedDetailerId) || displayDetailers[0]}
           onBack={() => setCurrentView("marketplace")}
-          onRequestQuote={(selectedServices: { id: string; name: string }[]) => {
+          onRequestQuote={(selectedServices: { id: string; name: string; price: number }[]) => {
             setPreselectedServices(selectedServices);
             if (currentUser.role === "client") {
               setOrderModalOpen(true);
