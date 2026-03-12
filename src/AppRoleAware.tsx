@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { SignInScreen } from "./components/SignInScreen";
 import { SignUpScreen } from "./components/SignUpScreen";
@@ -45,6 +45,7 @@ import { useAuth } from "./context/AuthContext";
 import { useDealerProfile } from "./hooks/useDealerProfile";
 import { useUnreadMessages } from "./hooks/useUnreadMessages";
 import { useNotifications } from "./hooks/useNotifications";
+import { StripeTestPage } from "./pages/StripeTestPage";
 
 type View =
   | "welcome"
@@ -73,7 +74,8 @@ type View =
   | "settings"
   | "notifications"
   | "terms"
-  | "privacy";
+  | "privacy"
+  | "stripe-test";
 
 type AuthFlow = "signin" | "signup";
 
@@ -148,6 +150,19 @@ export default function AppRoleAware() {
       sentAt: new Date(),
     }
   ]);
+
+  // Add global function to access test page
+  useEffect(() => {
+    // @ts-ignore
+    window.goToStripeTest = () => {
+      setCurrentView('stripe-test');
+    };
+    
+    // @ts-ignore  
+    window.goToWelcome = () => {
+      setCurrentView('welcome');
+    };
+  }, []);
 
   // Handle role selection from welcome screen (Continue button clicked)
   const handleContinueFromWelcome = (
@@ -642,6 +657,9 @@ export default function AppRoleAware() {
       case "notifications":
         setCurrentView("notifications");
         break;
+      case "stripe-test":
+        setCurrentView("stripe-test");
+        break;
     }
   };
 
@@ -1032,6 +1050,11 @@ export default function AppRoleAware() {
             }
           }}
         />
+      )}
+
+      {/* Stripe Test Page */}
+      {currentView === "stripe-test" && (
+        <StripeTestPage />
       )}
 
       {/* Detailer Profile (Public - same layout as dealer View Gig) */}
