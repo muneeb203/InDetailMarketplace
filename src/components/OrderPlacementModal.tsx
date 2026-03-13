@@ -104,13 +104,36 @@ export function OrderPlacementModal({
     if (resolvedSelectedServices.length > 0) {
       return resolvedSelectedServices.map((s) => ({ id: s.id, name: s.name, price: s.price, hasPrice: true }));
     }
+    
+    // If we have initial services but no resolved services, and we have offerings, try to match them
+    if (initialSelectedServices.length > 0 && offerings.length > 0) {
+      const matchedServices = initialSelectedServices.map((initialService) => {
+        const matchedOffering = offerings.find(offering => offering.id === initialService.id);
+        if (matchedOffering) {
+          return {
+            id: initialService.id,
+            name: initialService.name,
+            price: matchedOffering.price,
+            hasPrice: true
+          };
+        }
+        return {
+          id: initialService.id,
+          name: initialService.name,
+          price: typeof initialService.price === 'number' ? initialService.price : 0,
+          hasPrice: typeof initialService.price === 'number' && initialService.price >= 0,
+        };
+      });
+      return matchedServices;
+    }
+    
     return initialSelectedServices.map((s) => ({
       id: s.id,
       name: s.name,
       price: typeof s.price === 'number' ? s.price : 0,
       hasPrice: typeof s.price === 'number' && s.price >= 0,
     }));
-  }, [resolvedSelectedServices, initialSelectedServices]);
+  }, [resolvedSelectedServices, initialSelectedServices, offerings]);
 
   const isLoadingPrices = initialSelectedServices.length > 0 && resolvedSelectedServices.length === 0 && vehicleCategoryId !== null;
 
@@ -118,9 +141,20 @@ export function OrderPlacementModal({
     if (resolvedSelectedServices.length > 0) {
       return resolvedSelectedServices.reduce((sum, s) => sum + s.price, 0);
     }
+    
+    // If we have initial services but no resolved services, and we have offerings, try to match them
+    if (initialSelectedServices.length > 0 && offerings.length > 0) {
+      return initialSelectedServices.reduce((sum, initialService) => {
+        const matchedOffering = offerings.find(offering => offering.id === initialService.id);
+        if (matchedOffering) {
+          return sum + matchedOffering.price;
+        }
+        return sum + (typeof initialService.price === 'number' ? initialService.price : 0);
+      }, 0);
+    }
+    
     return initialSelectedServices.reduce((sum, s) => sum + (typeof s.price === 'number' ? s.price : 0), 0);
-  }, [resolvedSelectedServices, initialSelectedServices]);
-
+  }, [resolvedSelectedServices, initialSelectedServices, offerings]);
   const discount = promoApplied && promoCode.trim().toUpperCase() === 'SAVE10' ? subTotal * 0.1 : 0;
   const total = Math.max(0, subTotal - discount);
 
@@ -139,8 +173,8 @@ export function OrderPlacementModal({
     onError('Invalid promo code. Try SAVE10');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleProceedToPay = async () => {
+    console.log('Proceed to Pay button clicked');
 
     if (effectiveServiceIds.length === 0) {
       onError('Please select services on the gig page before requesting quote');
@@ -152,19 +186,25 @@ export function OrderPlacementModal({
     }
 
     // After basic validation, show Stripe checkout to collect payment details.
+    console.log('Showing Stripe checkout');
     setShowStripeCheckout(true);
   };
 
   const handleStripeSuccess = async () => {
     // After successful Stripe payment, create the order
+    console.log('handleStripeSuccess called');
     setSubmitting(true);
+    
     try {
       const paymentMeta = `Payment: card (Stripe) | subtotal=${subTotal.toFixed(2)} | discount=${discount.toFixed(2)} | total=${total.toFixed(2)}${promoApplied ? ` | promo=${promoCode.trim().toUpperCase()}` : ''}`;
       const mergedNotes = [paymentMeta, notes.trim()].filter(Boolean).join('\n');
 
+      console.log('Creating order with notes:', mergedNotes);
+
       let orderId: string;
 
       if (vehicleCategoryId) {
+        console.log('Creating order with services...');
         const orderWithServices = await createOrderWithServices({
           dealer_id: detailer.id,
           vehicle_category_id: vehicleCategoryId,
@@ -172,7 +212,9 @@ export function OrderPlacementModal({
           notes: mergedNotes || undefined,
         });
         orderId = orderWithServices.id;
+        console.log('Order created with services:', orderId);
       } else {
+        console.log('Creating legacy order...');
         // Fallback: no vehicle category, use legacy order with proposed_price = final total
         const legacyOrder = await createOrder(
           {
@@ -184,19 +226,30 @@ export function OrderPlacementModal({
           clientId
         );
         orderId = legacyOrder.id;
+        console.log('Legacy order created:', orderId);
       }
 
+      console.log('Order creation successful, calling onSuccess...');
       onSuccess(orderId);
+      
+      console.log('Closing modal...');
       onOpenChange(false);
+      
+      // Reset form state
       setPromoCode('');
       setPromoApplied(false);
       setNotes('');
       setShowStripeCheckout(false);
+      
+      console.log('handleStripeSuccess completed successfully');
     } catch (err: unknown) {
+      console.error('Error in handleStripeSuccess:', err);
       const msg = err instanceof Error ? err.message : 'Failed to create order';
+      console.error('Error message:', msg);
       onError(msg);
     } finally {
       setSubmitting(false);
+      console.log('handleStripeSuccess finally block executed');
     }
   };
 
@@ -210,7 +263,7 @@ export function OrderPlacementModal({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="space-y-5">
           {!showStripeCheckout ? (
             <>
               <div className="rounded-lg border p-3 bg-gray-50">
@@ -284,7 +337,8 @@ export function OrderPlacementModal({
                   Cancel
                 </Button>
                 <Button
-                  type="submit"
+                  type="button"
+                  onClick={handleProceedToPay}
                   disabled={submitting || effectiveServiceIds.length === 0}
                 >
                   {submitting ? 'Processing...' : 'Proceed to Pay'}
@@ -299,7 +353,7 @@ export function OrderPlacementModal({
               onError={onError}
             />
           )}
-        </form>
+        </div>
       </DialogContent>
     </Dialog>
   );

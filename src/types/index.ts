@@ -239,3 +239,6 @@ export interface Order {
   dealer?: { id: string; business_name?: string; base_location?: string };
   client?: { id: string; name?: string };
 }
+
+// Re-export marketplace payment types
+export * from './marketplacePayments';
