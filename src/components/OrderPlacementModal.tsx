@@ -269,23 +269,23 @@ export function OrderPlacementModal({
               <div className="rounded-lg border p-3 bg-gray-50">
                 <p className="text-sm font-medium mb-2">Selected Services</p>
                 {selectedServicesForDisplay.length > 0 ? (
-                  <div className="space-y-1.5">
+                  <ul className="space-y-1.5 list-none p-0 m-0">
                     {selectedServicesForDisplay.map((s) => (
-                      <div key={s.id} className="flex items-center justify-between text-sm">
+                      <li key={s.id} className="flex items-center justify-between text-sm">
                         <span>{s.name}</span>
                         <span className="font-medium">
                           {isLoadingPrices ? 'Loading...' : s.hasPrice ? `$${s.price.toFixed(2)}` : 'Selected'}
                         </span>
-                      </div>
+                      </li>
                     ))}
-                  </div>
+                  </ul>
                 ) : (
                   <p className="text-sm text-gray-500">No services selected on gig page.</p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="promo">Promo Code</Label>
+                <Label htmlFor="promo">Promo Code (optional)</Label>
                 <div className="flex gap-2">
                   <Input
                     id="promo"
