@@ -31,7 +31,7 @@ interface ProPublicProfileProps {
   /** When provided (client viewing a gig), use this detailer's data and show client CTAs */
   detailer?: Detailer;
   onBack?: () => void;
-  onRequestQuote?: (selectedServices: { id: string; name: string }[]) => void;
+  onRequestQuote?: (selectedServices: { id: string; name: string; price?: number }[]) => void;
   onMessage?: () => void;
 }
 
@@ -164,13 +164,28 @@ export function ProPublicProfile({ onNavigate, detailer: detailerProp, onBack, o
 
   const services = serviceOfferings
     .filter(offering => offering.is_active)
-    .map(offering => ({
-      id: offering.id,
-      name: offering.service.name,
-      description: offering.service.description,
-      price: formatPrice(offering.prices, offering.pricing_model),
-      pricingNote: offering.pricing_model === 'multi-tier' ? 'Varies by vehicle' : undefined
-    }));
+    .map(offering => {
+      const formattedPrice = formatPrice(offering.prices, offering.pricing_model);
+      // Get the numeric price for calculations
+      let numericPrice = 0;
+      if (offering.prices && offering.prices.length > 0) {
+        if (offering.pricing_model === 'single') {
+          numericPrice = offering.prices[0].price;
+        } else {
+          // For multi-tier, use the minimum price
+          numericPrice = Math.min(...offering.prices.map(p => p.price));
+        }
+      }
+      
+      return {
+        id: offering.id,
+        name: offering.service.name,
+        description: offering.service.description,
+        price: formattedPrice,
+        numericPrice: numericPrice,
+        pricingNote: offering.pricing_model === 'multi-tier' ? 'Varies by vehicle' : undefined
+      };
+    });
 
   const toggleServiceSelection = (offeringId: string) => {
     setSelectedOfferingIds((prev) => {
@@ -409,7 +424,11 @@ export function ProPublicProfile({ onNavigate, detailer: detailerProp, onBack, o
                   onRequestQuote(
                     services
                       .filter((service) => selectedOfferingIds.includes(service.id))
-                      .map((service) => ({ id: service.id, name: service.name }))
+                      .map((service) => ({ 
+                        id: service.id, 
+                        name: service.name,
+                        price: service.numericPrice
+                      }))
                   )
                 }
                 disabled={selectedOfferingIds.length === 0}
