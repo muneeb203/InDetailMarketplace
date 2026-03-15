@@ -14,6 +14,7 @@ import {
   Share2,
   Percent,
   Wrench,
+  CreditCard,
 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { useDealerProfile } from '../../../hooks/useDealerProfile';
@@ -25,6 +26,8 @@ import { AccountSecuritySection } from './AccountSecuritySection';
 import { SocialProfilesSection } from './SocialProfilesSection';
 import { PromotionsSection } from './PromotionsSection';
 import { ServiceConfigurationPanel } from '../../ServiceConfigurationPanel';
+import { DetailerConnectSetup } from '../../payments/DetailerConnectSetup';
+import { PaymentMethodManager } from '../../payments/PaymentMethodManager';
 
 interface DealerSettingsProps {
   onNavigate?: (view: string) => void;
@@ -37,6 +40,7 @@ const TAB_MAP: Record<string, string> = {
   location: 'location',
   business: 'business',
   services: 'services',
+  payments: 'payments',
   social: 'social',
   promotions: 'promotions',
   promo: 'promotions',
@@ -118,7 +122,7 @@ export function DealerSettings({ onNavigate, initialTab }: DealerSettingsProps) 
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-1 h-auto flex-wrap p-1 bg-gray-100 rounded-xl">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-1 h-auto flex-wrap p-1 bg-gray-100 rounded-xl">
           <TabsTrigger value="profile" className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <User className="w-4 h-4" />
             Profile
@@ -138,6 +142,10 @@ export function DealerSettings({ onNavigate, initialTab }: DealerSettingsProps) 
           <TabsTrigger value="services" className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <Wrench className="w-4 h-4" />
             Services
+          </TabsTrigger>
+          <TabsTrigger value="payments" className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+            <CreditCard className="w-4 h-4" />
+            Payments
           </TabsTrigger>
           <TabsTrigger value="social" className="gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <Share2 className="w-4 h-4" />
@@ -174,6 +182,42 @@ export function DealerSettings({ onNavigate, initialTab }: DealerSettingsProps) 
 
         <TabsContent value="services" className="mt-6">
           <ServiceConfigurationPanel dealerId={userId!} mode="settings" />
+        </TabsContent>
+
+        <TabsContent value="payments" className="mt-6">
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Payment Settings</h3>
+              <p className="text-gray-600 text-sm mb-4">
+                Manage your payout methods and Stripe account for receiving payments from clients.
+              </p>
+            </div>
+            
+            <DetailerConnectSetup
+              detailerId={userId!}
+              onSuccess={(account) => {
+                console.log('Stripe Connect account setup successful:', account);
+              }}
+              onError={(error) => {
+                console.error('Stripe Connect setup error:', error);
+              }}
+            />
+            
+            <div className="border-t pt-6">
+              <PaymentMethodManager
+                customerId={userId!}
+                onPaymentMethodAdded={(method) => {
+                  console.log('Payment method added:', method);
+                }}
+                onPaymentMethodRemoved={(id) => {
+                  console.log('Payment method removed:', id);
+                }}
+                onError={(error) => {
+                  console.error('Payment method error:', error);
+                }}
+              />
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="social" className="mt-6">

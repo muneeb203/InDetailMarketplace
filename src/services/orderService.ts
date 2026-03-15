@@ -62,6 +62,7 @@ export async function createOrder(input: CreateOrderInput, clientId: string): Pr
       notes: input.notes || null,
       scheduled_date: input.scheduled_date || null,
       status: 'pending',
+      marketplace_status: 'pending_payment', // Set marketplace status for payment system
     })
     .select()
     .single();
@@ -526,6 +527,7 @@ export async function createOrderWithServices(
         vehicle_category_id: input.vehicle_category_id,
         total_price: totalPrice,
         status: 'pending',
+        marketplace_status: 'pending_payment', // Set marketplace status for payment system
         notes: input.notes || null,
       })
       .select()

@@ -162,7 +162,15 @@ export default function AppRoleAware() {
     window.goToWelcome = () => {
       setCurrentView('welcome');
     };
-  }, []);
+
+    // @ts-ignore
+    window.goToPaymentSettings = () => {
+      if (currentUser?.role === 'detailer') {
+        setCurrentView('settings');
+        setProNavParams({ tab: 'payments' });
+      }
+    };
+  }, [currentUser]);
 
   // Handle role selection from welcome screen (Continue button clicked)
   const handleContinueFromWelcome = (

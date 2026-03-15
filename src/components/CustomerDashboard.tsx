@@ -4,6 +4,7 @@ import { Badge } from './ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Calendar, MessageSquare, Star, Clock, CheckCircle2, Car } from 'lucide-react';
+import { PaymentIntegrationHelper } from './PaymentIntegrationHelper';
 
 interface CustomerDashboardProps {
   customer: Customer;
@@ -77,6 +78,14 @@ export function CustomerDashboard({
                   </CardHeader>
                 </Card>
               </div>
+
+              {/* Payment Integration Helper */}
+              <PaymentIntegrationHelper
+                onNavigateToTest={() => {
+                  // @ts-ignore
+                  window.goToStripeTest?.();
+                }}
+              />
             </div>
 
             {/* Main Content Area */}

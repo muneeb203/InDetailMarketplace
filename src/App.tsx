@@ -10,6 +10,8 @@ import { DealersPage } from './admin/pages/DealersPage';
 import { OrdersPage } from './admin/pages/OrdersPage';
 import { ConversationsPage } from './admin/pages/ConversationsPage';
 import { ReviewsPage } from './admin/pages/ReviewsPage';
+import { PaymentNotificationManager } from './components/PaymentNotificationManager';
+import { StripeConnectSimulation } from './pages/StripeConnectSimulation';
 
 function AdminProtected() {
   const [loading, setLoading] = useState(true);
@@ -46,23 +48,26 @@ function AdminProtected() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="admin" element={<AdminProtected />}>
-          <Route index element={<Navigate to="/admin/login" replace />} />
-          <Route path="login" element={<AdminLogin />} />
-          <Route path="*" element={<AdminLayout />}>
-            <Route index element={<Navigate to="/admin/dashboard" replace />} />
-            <Route path="dashboard" element={<DashboardOverview />} />
-            <Route path="users" element={<UsersPage />} />
-            <Route path="dealers" element={<DealersPage />} />
-            <Route path="orders" element={<OrdersPage />} />
-            <Route path="conversations" element={<ConversationsPage />} />
-            <Route path="reviews" element={<ReviewsPage />} />
+    <PaymentNotificationManager>
+      <BrowserRouter>
+        <Routes>
+          <Route path="stripe-connect-simulation" element={<StripeConnectSimulation />} />
+          <Route path="admin" element={<AdminProtected />}>
+            <Route index element={<Navigate to="/admin/login" replace />} />
+            <Route path="login" element={<AdminLogin />} />
+            <Route path="*" element={<AdminLayout />}>
+              <Route index element={<Navigate to="/admin/dashboard" replace />} />
+              <Route path="dashboard" element={<DashboardOverview />} />
+              <Route path="users" element={<UsersPage />} />
+              <Route path="dealers" element={<DealersPage />} />
+              <Route path="orders" element={<OrdersPage />} />
+              <Route path="conversations" element={<ConversationsPage />} />
+              <Route path="reviews" element={<ReviewsPage />} />
+            </Route>
           </Route>
-        </Route>
-        <Route path="*" element={<AppRoleAware />} />
-      </Routes>
-    </BrowserRouter>
+          <Route path="*" element={<AppRoleAware />} />
+        </Routes>
+      </BrowserRouter>
+    </PaymentNotificationManager>
   );
 }

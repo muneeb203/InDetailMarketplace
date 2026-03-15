@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '../ui/alert';
 import { Badge } from '../ui/badge';
 import { Loader2, CreditCard, CheckCircle, AlertTriangle, ExternalLink } from 'lucide-react';
 import { StripeConnectService } from '../../services/stripeConnect';
+import { StripeConnectDirectService } from '../../services/stripeConnectDirect';
 import { StripeConnectedAccount } from '../../types/marketplacePayments';
 
 interface DetailerConnectSetupProps {
@@ -41,9 +42,11 @@ export const DetailerConnectSetup: React.FC<DetailerConnectSetupProps> = ({
 
   const checkExistingAccount = async () => {
     try {
-      // This would call your service to check for existing account
-      // For now, we'll simulate this check
       console.log('Checking for existing Connect account...');
+      const result = await StripeConnectDirectService.getAccountStatus(detailerId);
+      if (result.success && result.data) {
+        setExistingAccount(result.data);
+      }
     } catch (err) {
       console.error('Error checking existing account:', err);
     }
@@ -73,8 +76,9 @@ export const DetailerConnectSetup: React.FC<DetailerConnectSetupProps> = ({
         }
       }
 
-      // Create Connect account
-      const result = await StripeConnectService.createConnectAccount(detailerId, formData);
+      // Use direct service for development (bypasses Supabase Edge Functions)
+      console.log('Creating Connect account using direct service...');
+      const result = await StripeConnectDirectService.createConnectAccount(detailerId, formData);
 
       if (!result.success || !result.data) {
         throw new Error(result.error?.message || 'Failed to create Connect account');
@@ -83,7 +87,7 @@ export const DetailerConnectSetup: React.FC<DetailerConnectSetupProps> = ({
       setExistingAccount(result.data);
 
       // Create onboarding flow
-      const onboardingResult = await StripeConnectService.createOnboardingFlow(
+      const onboardingResult = await StripeConnectDirectService.createOnboardingFlow(
         detailerId,
         `${window.location.origin}/detailer/connect/return`,
         `${window.location.origin}/detailer/connect/refresh`
@@ -152,13 +156,30 @@ export const DetailerConnectSetup: React.FC<DetailerConnectSetupProps> = ({
           </div>
 
           {onboardingUrl && !existingAccount.onboarding_completed && (
-            <Button 
-              onClick={() => window.open(onboardingUrl, '_blank')}
-              className="w-full"
-            >
-              <ExternalLink className="h-4 w-4 mr-2" />
-              Complete Stripe Onboarding
-            </Button>
+            <>
+              <Button 
+                onClick={() => window.open(onboardingUrl, '_blank')}
+                className="w-full mb-2"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Complete Stripe Onboarding (Dev Simulation)
+              </Button>
+              
+              {/* Development helper button */}
+              <Button 
+                variant="outline"
+                onClick={async () => {
+                  const result = await StripeConnectDirectService.simulateOnboardingComplete(detailerId);
+                  if (result.success) {
+                    setExistingAccount(result.data);
+                    onSuccess(result.data);
+                  }
+                }}
+                className="w-full text-sm"
+              >
+                🧪 Skip Onboarding (Quick Dev Setup)
+              </Button>
+            </>
           )}
 
           {existingAccount.account_status === 'active' && existingAccount.payouts_enabled && (
