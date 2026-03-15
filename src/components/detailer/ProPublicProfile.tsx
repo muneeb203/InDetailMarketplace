@@ -162,6 +162,13 @@ export function ProPublicProfile({ onNavigate, detailer: detailerProp, onBack, o
     }
   };
 
+  /** Numeric price for checkout: single = first price; multi-tier = min price */
+  const getNumericPrice = (offering: ServiceOfferingWithPrices): number => {
+    if (!offering.prices || offering.prices.length === 0) return 0;
+    if (offering.pricing_model === 'single') return offering.prices[0].price;
+    return Math.min(...offering.prices.map((p) => p.price));
+  };
+
   const services = serviceOfferings
     .filter(offering => offering.is_active)
     .map(offering => {
