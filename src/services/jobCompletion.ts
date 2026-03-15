@@ -9,6 +9,7 @@ import {
   MARKETPLACE_CONSTANTS
 } from '../types/marketplacePayments';
 import { PayoutProcessingService } from './payoutProcessing';
+import { PaymentNotificationService } from './paymentNotifications';
 
 export class JobCompletionService {
   /**
@@ -114,8 +115,14 @@ export class JobCompletionService {
       // Schedule auto-release (this would typically be handled by a background job)
       await this.scheduleAutoRelease(request.order_id, confirmationDeadline);
 
-      // Send notification to client
-      await this.sendCompletionNotification(order.client_id, request.order_id);
+      // Send notification to client about job completion
+      await PaymentNotificationService.notifyJobCompleted({
+        orderId: request.order_id,
+        clientId: order.client_id,
+        detailerId: request.detailer_id,
+        amount: order.amount_total || 0,
+        confirmationDeadline
+      });
 
       return {
         success: true,
@@ -473,7 +480,14 @@ export class JobCompletionService {
       }
 
       // Send auto-release notifications
-      await this.sendAutoReleaseNotifications(order.client_id, order.dealer_id, orderId);
+      await PaymentNotificationService.notifyAutoRelease({
+        orderId,
+        clientId: order.client_id,
+        detailerId: order.dealer_id,
+        amount: order.amount_total || 0,
+        paymentType: '85_percent',
+        orderStatus: 'auto_confirmed'
+      });
 
       return {
         success: true,

@@ -10,6 +10,7 @@ import {
   MARKETPLACE_CONSTANTS
 } from '../types/marketplacePayments';
 import { StripeAccountValidationService } from './stripeAccountValidation';
+import { PaymentNotificationService } from './paymentNotifications';
 
 // Supabase Edge Functions base URL
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -117,6 +118,16 @@ export class PayoutProcessingService {
         .from('orders')
         .update({ marketplace_status: 'in_progress' })
         .eq('id', orderId);
+
+      // Send notifications about upfront payment
+      await PaymentNotificationService.notifyUpfrontPayment({
+        orderId,
+        clientId: order.client_id,
+        detailerId,
+        amount: order.amount_total,
+        paymentType: '15_percent',
+        orderStatus: 'in_progress'
+      });
 
       return {
         success: true,
@@ -256,6 +267,16 @@ export class PayoutProcessingService {
           confirmed_at: new Date().toISOString()
         })
         .eq('id', orderId);
+
+      // Send notifications about final payment
+      await PaymentNotificationService.notifyFinalPayment({
+        orderId,
+        clientId: order.client_id,
+        detailerId,
+        amount: order.amount_total,
+        paymentType: '85_percent',
+        orderStatus: 'completed'
+      });
 
       return {
         success: true,

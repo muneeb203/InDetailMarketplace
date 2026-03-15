@@ -7,6 +7,8 @@ import { ImageWithFallback } from './figma/ImageWithFallback';
 import { PhotoGallery } from './PhotoGallery';
 import { fetchDealerSocialLinks, type SocialPlatform } from '../services/dealerSocialService';
 import { fetchDealerReviews, fetchDealerRating } from '../services/dealerReviewService';
+import { PromotionService, PromotionBanner } from '../services/promotionService';
+import { PromoBanner } from './detailer/PromoBanner';
 
 interface DetailerProfileProps {
   detailer: Detailer;
@@ -29,6 +31,7 @@ export function DetailerProfile({ detailer, onBack, onRequestQuote, onMessage }:
   const [socialLinks, setSocialLinks] = useState<{ platform: SocialPlatform; url: string }[]>([]);
   const [reviews, setReviews] = useState<{ id: string; rating: number; review_text: string | null; created_at: string; client_name: string }[]>([]);
   const [dealerRating, setDealerRating] = useState<{ rating: number; review_count: number } | null>(null);
+  const [promotionBanner, setPromotionBanner] = useState<PromotionBanner | null>(null);
 
   useEffect(() => {
     fetchDealerSocialLinks(detailer.id)
@@ -39,6 +42,13 @@ export function DetailerProfile({ detailer, onBack, onRequestQuote, onMessage }:
   useEffect(() => {
     fetchDealerReviews(detailer.id).then(setReviews).catch(() => setReviews([]));
     fetchDealerRating(detailer.id).then(setDealerRating).catch(() => setDealerRating(null));
+  }, [detailer.id]);
+
+  // Fetch promotion banner
+  useEffect(() => {
+    PromotionService.getPromotionBanner(detailer.id)
+      .then(setPromotionBanner)
+      .catch(() => setPromotionBanner(null));
   }, [detailer.id]);
 
   return (
@@ -71,6 +81,19 @@ export function DetailerProfile({ detailer, onBack, onRequestQuote, onMessage }:
                 </Badge>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Promotion Banner */}
+        {promotionBanner && (
+          <div className="p-4">
+            <PromoBanner
+              title={promotionBanner.title}
+              description={promotionBanner.description}
+              startDate={promotionBanner.startDate}
+              endDate={promotionBanner.endDate}
+              active={promotionBanner.active || false}
+            />
           </div>
         )}
 

@@ -28,6 +28,7 @@ const PaymentFormContent: React.FC<ClientPaymentFormProps> = ({
   const elements = useElements();
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
 
   const formatCurrency = (cents: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -70,8 +71,29 @@ const PaymentFormContent: React.FC<ClientPaymentFormProps> = ({
       }
 
       const { client_secret } = paymentResult.data;
+      setClientSecret(client_secret);
 
-      // Confirm payment with Stripe
+      // Check if this is a development mock payment BEFORE calling Stripe
+      if (client_secret.includes('pi_dev_')) {
+        console.log('🎭 Development mode: Simulating successful payment without calling Stripe API');
+        console.log('🎭 Mock client secret:', client_secret);
+        
+        // Simulate a delay like a real payment
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Simulate successful payment for development
+        const mockPaymentIntent = {
+          id: client_secret.split('_secret_')[0],
+          status: 'succeeded'
+        };
+        console.log('🎭 Simulated payment success:', mockPaymentIntent);
+        onSuccess(mockPaymentIntent.id);
+        return;
+      }
+
+      console.log('🔄 Real Stripe mode: Processing actual payment...');
+      
+      // Only call Stripe API for real client secrets
       const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(client_secret, {
         payment_method: {
           card: cardElement,
@@ -196,6 +218,11 @@ const PaymentFormContent: React.FC<ClientPaymentFormProps> = ({
           {/* Test Card Info */}
           <div className="text-xs text-gray-400 text-center">
             Test card: 4242 4242 4242 4242 (any future date, any CVC)
+            {clientSecret?.includes('pi_dev_') && (
+              <div className="text-orange-600 font-semibold mt-2 p-2 bg-orange-50 rounded border border-orange-200">
+                🔧 Development Mode: Payment will be simulated (no real charges)
+              </div>
+            )}
           </div>
         </form>
       </CardContent>

@@ -14,6 +14,7 @@ import { useExposureMetrics } from '../../hooks/useExposureMetrics';
 import { useUpcomingBookings } from '../../hooks/useUpcomingBookings';
 import { getDealerCompletedOrdersCount } from '../../services/orderService';
 import { fetchDealerRating } from '../../services/dealerReviewService';
+import { PaymentIntegrationHelper } from '../PaymentIntegrationHelper';
 
 interface ProDashboardProps {
   onNavigate?: (view: string, params?: any) => void;
@@ -142,6 +143,12 @@ export function ProDashboard({ onNavigate }: ProDashboardProps) {
 
           {/* Right: Metrics, promo, orders, activity, bookings */}
           <div className="lg:col-span-2 space-y-5">
+            {/* Payment Integration Helper */}
+            <PaymentIntegrationHelper
+              onNavigateToSettings={() => handleOpenSettings('payments')}
+              onNavigateToTest={() => onNavigate?.('stripe-test')}
+            />
+
             <ExposureMetrics
               {...metrics}
               period={period}

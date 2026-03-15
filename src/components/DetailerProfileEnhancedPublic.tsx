@@ -26,9 +26,11 @@ import { useAuth } from '../context/AuthContext';
 import { trackProfileView, toggleDealerSave, getPublicDealerStats, isDealerSavedByClient } from '../services/exposureService';
 import { fetchDealerSocialLinks, type SocialPlatform } from '../services/dealerSocialService';
 import { fetchDealerReviews, fetchDealerRating } from '../services/dealerReviewService';
+import { PromotionService, PromotionBanner } from '../services/promotionService';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { BeforeAfterCarousel } from './BeforeAfterCarousel';
 import { TrustCuesBadge } from './TrustCuesBadge';
+import { PromoBanner } from './detailer/PromoBanner';
 
 interface DetailerProfileEnhancedPublicProps {
   detailer: Detailer;
@@ -50,6 +52,7 @@ export function DetailerProfileEnhancedPublic({
   const [videoPlaying, setVideoPlaying] = useState(false);
   const [publicStats, setPublicStats] = useState<{ profile_views: number; saves: number } | null>(null);
   const [isSaved, setIsSaved] = useState(false);
+  const [promotionBanner, setPromotionBanner] = useState<PromotionBanner | null>(null);
   const profileViewTracked = useRef(false);
 
   // Track profile view once per page load (do not block UI)
@@ -80,6 +83,13 @@ export function DetailerProfileEnhancedPublic({
   useEffect(() => {
     fetchDealerReviews(detailer.id).then(setReviews).catch(() => setReviews([]));
     fetchDealerRating(detailer.id).then(setDealerRating).catch(() => setDealerRating(null));
+  }, [detailer.id]);
+
+  // Fetch promotion banner
+  useEffect(() => {
+    PromotionService.getPromotionBanner(detailer.id)
+      .then(setPromotionBanner)
+      .catch(() => setPromotionBanner(null));
   }, [detailer.id]);
 
   const handleSaveToggle = async () => {
@@ -190,6 +200,19 @@ export function DetailerProfileEnhancedPublic({
 
       {/* Content */}
       <div className="flex-1 overflow-auto pb-24">
+        {/* Promotion Banner */}
+        {promotionBanner && (
+          <div className="m-4">
+            <PromoBanner
+              title={promotionBanner.title}
+              description={promotionBanner.description}
+              startDate={promotionBanner.startDate}
+              endDate={promotionBanner.endDate}
+              active={promotionBanner.active || false}
+            />
+          </div>
+        )}
+
         {/* Brand Header Card */}
         {/* Gig Brief Details */}
         <Card className="m-4 p-6 bg-gradient-to-br from-white via-blue-50/30 to-purple-50/30 border-2 border-blue-100">

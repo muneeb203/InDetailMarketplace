@@ -5,6 +5,7 @@ import { PaymentStatusCard } from '../components/payments/PaymentStatusCard';
 import { ClientPaymentForm } from '../components/payments/ClientPaymentForm';
 import { DetailerConnectSetup } from '../components/payments/DetailerConnectSetup';
 import { PaymentMethodManager } from '../components/payments/PaymentMethodManager';
+import { PaymentNotificationDemo } from '../components/PaymentNotificationDemo';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
@@ -86,11 +87,12 @@ export const StripeTestPage: React.FC = () => {
 
       {/* Tabbed Interface */}
       <Tabs defaultValue="integration" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="integration">Integration Tests</TabsTrigger>
           <TabsTrigger value="client">Client Payments</TabsTrigger>
           <TabsTrigger value="detailer">Detailer Setup</TabsTrigger>
           <TabsTrigger value="components">Components Demo</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
         </TabsList>
 
         {/* Integration Tests Tab */}
@@ -214,6 +216,11 @@ export const StripeTestPage: React.FC = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Notifications Tab */}
+        <TabsContent value="notifications" className="space-y-6">
+          <PaymentNotificationDemo />
+        </TabsContent>
       </Tabs>
 
       {/* Environment Check */}
@@ -226,8 +233,8 @@ export const StripeTestPage: React.FC = () => {
             <div>
               <strong>Stripe Publishable Key:</strong>
               <p className="font-mono text-xs bg-gray-100 p-2 rounded mt-1">
-                {import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ? 
-                  `${import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY.substring(0, 20)}...` : 
+                {(import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY ? 
+                  `${(import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY.substring(0, 20)}...` : 
                   'Not configured'
                 }
               </p>
@@ -235,7 +242,7 @@ export const StripeTestPage: React.FC = () => {
             <div>
               <strong>Supabase URL:</strong>
               <p className="font-mono text-xs bg-gray-100 p-2 rounded mt-1">
-                {import.meta.env.VITE_SUPABASE_URL || 'Not configured'}
+                {(import.meta as any).env.VITE_SUPABASE_URL || 'Not configured'}
               </p>
             </div>
           </div>
