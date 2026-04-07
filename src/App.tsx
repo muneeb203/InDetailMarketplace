@@ -10,6 +10,7 @@ import { DealersPage } from './admin/pages/DealersPage';
 import { OrdersPage } from './admin/pages/OrdersPage';
 import { ConversationsPage } from './admin/pages/ConversationsPage';
 import { ReviewsPage } from './admin/pages/ReviewsPage';
+import { AdminSettings } from './pages/AdminSettings';
 import { PaymentNotificationManager } from './components/PaymentNotificationManager';
 import { StripeConnectSimulation } from './pages/StripeConnectSimulation';
 
@@ -63,6 +64,7 @@ export default function App() {
               <Route path="orders" element={<OrdersPage />} />
               <Route path="conversations" element={<ConversationsPage />} />
               <Route path="reviews" element={<ReviewsPage />} />
+              <Route path="settings" element={<AdminSettings />} />
             </Route>
           </Route>
           <Route path="*" element={<AppRoleAware />} />

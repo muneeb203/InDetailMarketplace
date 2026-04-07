@@ -7,6 +7,7 @@ import {
   ShoppingBag,
   MessageSquare,
   Star,
+  Settings,
   LogOut,
 } from 'lucide-react';
 
@@ -17,6 +18,7 @@ const nav = [
   { to: '/admin/orders', label: 'Orders', icon: ShoppingBag },
   { to: '/admin/conversations', label: 'Conversations', icon: MessageSquare },
   { to: '/admin/reviews', label: 'Reviews', icon: Star },
+  { to: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 
 export function AdminLayout() {

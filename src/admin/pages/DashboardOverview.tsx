@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { fetchAdminStats, subscribeAdminRealtime } from '../adminApi';
 import { Users, Store, ShoppingBag, MessageSquare, Star, DollarSign } from 'lucide-react';
+import { StripeSetupBanner } from '../../components/admin/StripeSetupNotification';
 
 export function DashboardOverview() {
   const [stats, setStats] = useState<Awaited<ReturnType<typeof fetchAdminStats>> | null>(null);
@@ -48,6 +49,8 @@ export function DashboardOverview() {
 
   return (
     <div className="space-y-6">
+      <StripeSetupBanner />
+      
       <h1 className="text-2xl font-bold text-gray-900">Dashboard Overview</h1>
       <p className="text-sm text-gray-500">Real-time data. Updates automatically.</p>
 
