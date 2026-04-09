@@ -1,0 +1,35 @@
+# Supabase Configuration File
+# This file configures your local Supabase development environment
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[auth]
+enabled = true
+port = 54324
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["https://localhost:3000"]
+jwt_expiry = 3600
+enable_signup = true
+enable_confirmations = false
+
+[edge_functions]
+enabled = true
+port = 54323
+
+# Environment variables for Edge Functions
+# These are loaded into your Edge Functions at runtime
+[edge_functions.env]
+SUPABASE_URL = "https://dzuhcmccxfouiqqttvjz.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR6dWhjbWNjeGZvdWlxcXR0dmp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0NTYzMjEsImV4cCI6MjA4NjAzMjMyMX0.fHf-8HYG5LnlKaE-ib9ieisKJVuQUrdKhEseXFm-Ppg"
+# STRIPE SECRET KEY - Added for local development
+# STRIPE_SECRET_KEY = "sk_live_YOUR_SECRET_KEY_HERE"
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
