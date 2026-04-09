@@ -18,6 +18,7 @@ import {
 import { StripeSetupPanel } from '../components/admin/StripeSetupPanel';
 import { stripeConfigService } from '../services/stripeConfigService';
 import { useAuth } from '../context/AuthContext';
+import { SecureSettingsGate } from '../components/admin/SecureSettingsGate';
 
 export const AdminSettings: React.FC = () => {
   const { user, profile } = useAuth();
@@ -68,65 +69,67 @@ export const AdminSettings: React.FC = () => {
   */
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Admin Settings</h1>
-          <p className="text-gray-600 mt-1">
-            Manage your marketplace configuration and integrations
-          </p>
+    <SecureSettingsGate>
+      <div className="container mx-auto px-4 py-8 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Admin Settings</h1>
+            <p className="text-gray-600 mt-1">
+              Manage your marketplace configuration and integrations
+            </p>
+          </div>
+          <Badge variant={stripeConfigured ? "default" : "destructive"}>
+            {stripeConfigured ? "Payments Active" : "Setup Required"}
+          </Badge>
         </div>
-        <Badge variant={stripeConfigured ? "default" : "destructive"}>
-          {stripeConfigured ? "Payments Active" : "Setup Required"}
-        </Badge>
+
+        {!loading && !stripeConfigured && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Payment Setup Required:</strong> Configure your Stripe account to enable payments in your marketplace.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="payments" className="flex items-center gap-2">
+              <CreditCard className="h-4 w-4" />
+              Payments
+            </TabsTrigger>
+            <TabsTrigger value="users" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Users
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="flex items-center gap-2">
+              <Bell className="h-4 w-4" />
+              Notifications
+            </TabsTrigger>
+            <TabsTrigger value="system" className="flex items-center gap-2">
+              <Database className="h-4 w-4" />
+              System
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="payments">
+            <StripeSetupPanel onSetupComplete={() => setStripeConfigured(true)} />
+          </TabsContent>
+
+          <TabsContent value="users">
+            <UserManagementPanel />
+          </TabsContent>
+
+          <TabsContent value="notifications">
+            <NotificationSettingsPanel />
+          </TabsContent>
+
+          <TabsContent value="system">
+            <SystemSettingsPanel />
+          </TabsContent>
+        </Tabs>
       </div>
-
-      {!loading && !stripeConfigured && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            <strong>Payment Setup Required:</strong> Configure your Stripe account to enable payments in your marketplace.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="payments" className="flex items-center gap-2">
-            <CreditCard className="h-4 w-4" />
-            Payments
-          </TabsTrigger>
-          <TabsTrigger value="users" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Users
-          </TabsTrigger>
-          <TabsTrigger value="notifications" className="flex items-center gap-2">
-            <Bell className="h-4 w-4" />
-            Notifications
-          </TabsTrigger>
-          <TabsTrigger value="system" className="flex items-center gap-2">
-            <Database className="h-4 w-4" />
-            System
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="payments">
-          <StripeSetupPanel onSetupComplete={() => setStripeConfigured(true)} />
-        </TabsContent>
-
-        <TabsContent value="users">
-          <UserManagementPanel />
-        </TabsContent>
-
-        <TabsContent value="notifications">
-          <NotificationSettingsPanel />
-        </TabsContent>
-
-        <TabsContent value="system">
-          <SystemSettingsPanel />
-        </TabsContent>
-      </Tabs>
-    </div>
+    </SecureSettingsGate>
   );
 };
 
