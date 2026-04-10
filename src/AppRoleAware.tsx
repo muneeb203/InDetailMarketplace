@@ -1,0 +1,1451 @@
+import { useState, useMemo, useEffect } from "react";
+import { WelcomeScreen } from "./components/WelcomeScreen";
+import { SignInScreen } from "./components/SignInScreen";
+import { SignUpScreen } from "./components/SignUpScreen";
+import { ClientOnboarding } from "./components/ClientOnboarding";
+import { DetailerOnboarding } from "./components/DetailerOnboarding";
+import { MarketplaceSearchEnhanced } from "./components/MarketplaceSearchEnhanced";
+import { DetailerDashboardEnhanced } from "./components/DetailerDashboardEnhanced";
+import { StatusDemoPage } from "./components/StatusDemoPage";
+import { RoleGuard } from "./components/RoleGuard";
+import { BottomNavigation } from "./components/BottomNavigation";
+import { BookingsPageIntegrated } from "./components/BookingsPageIntegrated";
+import { MessagesPageIntegrated } from "./components/MessagesPageIntegrated";
+import { ProfileRoleAware } from "./components/ProfileRoleAware";
+import { ClientJobStatusPage } from "./components/ClientJobStatusPage";
+import { DetailerJobStatusPage } from "./components/DetailerJobStatusPage";
+import { StatusCenter } from "./components/StatusCenter";
+import { BookingRequestForm } from "./components/BookingRequestForm";
+import { DetailerProfile } from "./components/DetailerProfile";
+import { OrderPlacementModal } from "./components/OrderPlacementModal";
+import { ClientOrdersPage } from "./components/ClientOrdersPage";
+import { ProDashboard } from "./components/detailer/ProDashboard";
+import { ProPublicProfile } from "./components/detailer/ProPublicProfile";
+import { ProLeadInbox } from "./components/detailer/ProLeadInbox";
+import { DealerOrdersQueue } from "./components/detailer/DealerOrdersQueue";
+import { DealerSettings } from "./components/detailer/DealerSettings/DealerSettings";
+import { ClientSettings } from "./components/ClientSettings";
+import { DetailerProfileHome } from "./components/detailer/DetailerProfileHome";
+import { TermsOfService } from "./components/TermsOfService";
+import { PrivacyPolicy } from "./components/PrivacyPolicy";
+import { WebLayout } from "./components/WebLayout";
+import { NotificationsPage } from "./components/NotificationsPage";
+import { Toaster } from "./components/ui/sonner";
+import { toast } from "sonner";
+import { Customer, Detailer, Lead } from "./types";
+import { useDetailers } from "./hooks/useDetailers";
+import { useDebounce } from "./hooks/useDebounce";
+import { signUpAuthOnly, createMinimalProfile, createClientProfile, createDealerProfile, signInAndLoadProfile, signInWithGoogle, signUpWithGoogle, loadProfileForUser } from "./services/supabaseAuth";
+import { supabase } from "./lib/supabaseClient";
+import { getLeadCost } from "./services/stripeService";
+import { FileText, AlertCircle, ArrowLeft } from "lucide-react";
+import { Button } from "./components/ui/button";
+import { DebugDataSource } from "./components/DebugDataSource";
+import { useAuth } from "./context/AuthContext";
+import { useDealerProfile } from "./hooks/useDealerProfile";
+import { useUnreadMessages } from "./hooks/useUnreadMessages";
+import { useNotifications } from "./hooks/useNotifications";
+import { StripeTestPage } from "./pages/StripeTestPage";
+
+type View =
+  | "welcome"
+  | "signin"
+  | "signup"
+  | "onboarding-client"
+  | "onboarding-detailer"
+  | "marketplace"
+  | "dashboard"
+  | "messages"
+  | "bookings"
+  | "my-orders"
+  | "profile"
+  | "status-demo"
+  | "job-status"
+  | "status"
+  | "request-quote"
+  | "detailer-profile"
+  | "pro-dashboard"
+  | "pro-profile-editor"
+  | "pro-public-profile"
+  | "pro-lead-inbox"
+  | "orders-queue"
+  | "quotes"
+  | "alerts"
+  | "settings"
+  | "notifications"
+  | "terms"
+  | "privacy"
+  | "stripe-test";
+
+type AuthFlow = "signin" | "signup";
+
+export default function AppRoleAware() {
+  const { currentUser, setCurrentUser, clearUser } = useAuth();
+  const [currentView, setCurrentView] = useState<View>("welcome");
+  const [selectedRole, setSelectedRole] = useState<"client" | "detailer" | null>(null);
+  const [authFlow, setAuthFlow] = useState<AuthFlow>("signin");
+  const [tempUserData, setTempUserData] = useState<{
+    userId: string;
+    name: string;
+    email: string;
+    phone: string;
+    role: "client" | "detailer";
+  } | null>(null);
+  const [selectedBookingId, setSelectedBookingId] = useState<
+    string | null
+  >(null);
+  const [selectedDetailerId, setSelectedDetailerId] = useState<
+    string | null
+  >(null);
+  const [dealerIdToOpen, setDealerIdToOpen] = useState<string | null>(null);
+  const [viewingConversationId, setViewingConversationId] = useState<string | null>(null);
+  const [proNavParams, setProNavParams] = useState<any>({});
+  const [orderModalOpen, setOrderModalOpen] = useState(false);
+  const [preselectedServices, setPreselectedServices] = useState<{ id: string; name: string; price?: number }[]>([]);
+  
+  // Dealer name search with 300ms debounce
+  const [dealerSearchQuery, setDealerSearchQuery] = useState('');
+  const debouncedDealerSearch = useDebounce(dealerSearchQuery, 300);
+  // Filters for Sort By, Price Range, Service Type
+  const [sortBy, setSortBy] = useState<'relevance' | 'distance' | 'rating'>('relevance');
+  const [priceFilter, setPriceFilter] = useState<string>('all');
+  const [serviceFilter, setServiceFilter] = useState<string>('all');
+  const dealerFilters = useMemo(
+    () => ({
+      businessName: debouncedDealerSearch.trim() || undefined,
+      priceRange: priceFilter !== 'all' ? priceFilter : undefined,
+      service: serviceFilter !== 'all' ? serviceFilter : undefined,
+    }),
+    [debouncedDealerSearch, priceFilter, serviceFilter]
+  );
+
+  // Fetch real detailers from Supabase
+  const { detailers, loading: detailersLoading, error: detailersError } = useDetailers(dealerFilters);
+  const { data: dealerProfile } = useDealerProfile(
+    currentUser?.role === 'detailer' ? currentUser.id : undefined
+  );
+  const { unreadCount, markAsRead } = useUnreadMessages(
+    currentUser?.id,
+    currentUser?.role ?? 'client',
+    viewingConversationId
+  );
+  const { unreadCount: unreadNotifications } = useNotifications(currentUser?.id);
+  
+  // Log what we got from Supabase
+  console.log('📊 Detailers from Supabase:', detailers.length, 'detailers');
+  console.log('⏳ Loading:', detailersLoading);
+  console.log('❌ Error:', detailersError);
+  
+  const displayDetailers = detailers;
+  
+  // Mock leads for demo (TODO: Replace with real leads from database)
+  const [mockLeads, setMockLeads] = useState<Lead[]>([
+    {
+      id: 'lead-1',
+      requestId: 'req-1',
+      detailerId: 'd1',
+      customerId: 'c1',
+      status: 'pending',
+      cost: getLeadCost(false, false),
+      sentAt: new Date(),
+    }
+  ]);
+
+  // Add global function to access test page
+  useEffect(() => {
+    // @ts-ignore
+    window.goToStripeTest = () => {
+      setCurrentView('stripe-test');
+    };
+    
+    // @ts-ignore  
+    window.goToWelcome = () => {
+      setCurrentView('welcome');
+    };
+
+    // @ts-ignore
+    window.goToPaymentSettings = () => {
+      if (currentUser?.role === 'detailer') {
+        setCurrentView('settings');
+        setProNavParams({ tab: 'payments' });
+      }
+    };
+  }, [currentUser]);
+
+  // Shared helper — build user object + navigate after any successful OAuth sign-in
+  const navigateAfterSignIn = async (
+    result: Awaited<ReturnType<typeof loadProfileForUser>>,
+    role: 'client' | 'detailer',
+    _session: { user: { id: string } },
+  ) => {
+    if (role === 'client') {
+      if (!result.clientProfile) {
+        setTempUserData({
+          userId: result.user.id,
+          name: result.profile.name,
+          email: result.profile.email,
+          phone: result.profile.phone ?? '',
+          role: 'client',
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setCurrentUser({
+          id: result.profile.id,
+          role: 'client',
+          email: result.profile.email,
+          phone: result.profile.phone ?? '',
+          name: result.profile.name,
+          location: 'Unknown',
+          createdAt: new Date(result.profile.created_at ?? new Date()),
+          avatar: result.profile.avatar_url ?? undefined,
+          vehicles: [],
+        } as any);
+        setSelectedRole('client');
+        setCurrentView('onboarding-client');
+        toast.success('Welcome! Please complete your profile.');
+        return;
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setCurrentUser({
+        id: result.profile.id,
+        role: 'client',
+        email: result.profile.email,
+        phone: result.profile.phone ?? '',
+        name: result.profile.name,
+        location: result.clientProfile?.base_location ?? 'Unknown',
+        createdAt: new Date(result.profile.created_at ?? new Date()),
+        avatar: result.profile.avatar_url ?? undefined,
+        vehicles: result.clientProfile?.vehicle_make
+          ? [{ id: '1', make: result.clientProfile.vehicle_make, model: result.clientProfile.vehicle_model ?? '', year: result.clientProfile.vehicle_year ?? new Date().getFullYear(), type: 'Sedan', isDefault: true }]
+          : [],
+      } as any);
+      setSelectedRole('client');
+      setCurrentView('marketplace');
+      toast.success('Welcome back!');
+    } else {
+      const dealer = result.dealerProfile;
+      if (!dealer) {
+        setTempUserData({
+          userId: result.user.id,
+          name: result.profile.name,
+          email: result.profile.email,
+          phone: result.profile.phone ?? '',
+          role: 'detailer',
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setCurrentUser({
+          id: result.profile.id,
+          role: 'detailer',
+          email: result.profile.email,
+          phone: result.profile.phone ?? '',
+          name: result.profile.name,
+          businessName: 'My Detailing Business',
+          bio: 'Complete your profile to get started.',
+          avatar: result.profile.avatar_url ?? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80',
+          location: 'Unknown',
+          serviceRadius: 15,
+          priceRange: '$',
+          rating: 0,
+          photos: [],
+          services: [],
+          specialties: [],
+          isPro: false,
+          wallet: 0,
+          completedJobs: 0,
+          createdAt: new Date(result.profile.created_at ?? new Date()),
+        } as any);
+        setSelectedRole('detailer');
+        setCurrentView('onboarding-detailer');
+        toast.success('Welcome! Please complete your business details.');
+        return;
+      }
+      const { count: completedJobsCount } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('dealer_id', result.profile.id)
+        .eq('status', 'completed');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setCurrentUser({
+        id: result.profile.id,
+        role: 'detailer',
+        email: result.profile.email,
+        phone: result.profile.phone ?? '',
+        name: result.profile.name,
+        businessName: dealer.business_name ?? 'My Detailing Business',
+        bio: `Welcome to ${dealer.business_name ?? 'our detailing business'}! We offer premium auto detailing services.`,
+        avatar: result.profile.avatar_url ?? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80',
+        location: dealer.base_location ?? 'Unknown',
+        serviceRadius: (dealer.services_offered as any)?.serviceRadius ?? 15,
+        priceRange: dealer.price_range ?? '$',
+        rating: Number(dealer.rating ?? 0),
+        photos: [],
+        services: ((dealer.services_offered as any)?.specialties as string[]) ?? [],
+        specialties: ((dealer.services_offered as any)?.specialties as string[]) ?? [],
+        isPro: false,
+        wallet: 0,
+        completedJobs: completedJobsCount ?? 0,
+        createdAt: new Date(result.profile.created_at ?? new Date()),
+      } as any);
+      setSelectedRole('detailer');
+      setCurrentView('pro-dashboard');
+      toast.success('Welcome back!');
+    }
+  };
+
+  // Handle Google OAuth callback on app load (covers both sign-up and sign-in)
+  useEffect(() => {
+    const handleGoogleCallback = async () => {
+
+      // ── Detect OAuth error params before anything else ───────────────────
+      const urlParams = new URLSearchParams(window.location.search);
+      const hashParams = new URLSearchParams(window.location.hash.slice(1));
+      const oauthErrorCode = urlParams.get('error_code') || hashParams.get('error_code');
+      const oauthErrorDesc = urlParams.get('error_description') || hashParams.get('error_description');
+
+      if (oauthErrorCode || oauthErrorDesc) {
+        // Clean the dirty URL immediately
+        window.history.replaceState({}, document.title, window.location.pathname);
+        localStorage.removeItem('pending_google_role');
+        localStorage.removeItem('pending_google_signup');
+
+        // Show a helpful, specific error message
+        if (oauthErrorCode === 'unexpected_failure' || oauthErrorDesc?.includes('updating user')) {
+          toast.error('Google sign-in failed', {
+            description: 'A server error occurred. Please try again or contact support if the issue persists.',
+            duration: 8000,
+          });
+        } else if (oauthErrorCode === 'access_denied') {
+          toast.error('Sign-in cancelled', {
+            description: 'You cancelled the Google sign-in. Try again when ready.',
+            duration: 4000,
+          });
+        } else {
+          toast.error('Google sign-in failed', {
+            description: (oauthErrorDesc ?? oauthErrorCode ?? 'Unknown error').replace(/\+/g, ' '),
+            duration: 6000,
+          });
+        }
+        return;
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+
+      // Clean URL after OAuth success (removes access_token from hash / code from query)
+      if (window.location.hash.includes('access_token') || window.location.search.includes('code=')) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+
+      if (!session) return;
+
+      const pendingSignupRaw = localStorage.getItem('pending_google_signup');
+      const pendingRole = localStorage.getItem('pending_google_role') as 'client' | 'detailer' | null;
+
+      // ── Case A: Returning from Google sign-UP ────────────────────────────
+      if (pendingSignupRaw) {
+        localStorage.removeItem('pending_google_signup');
+        const d = JSON.parse(pendingSignupRaw) as { name: string; phone: string; role: 'client' | 'detailer' };
+        const email = session.user.email ?? '';
+        try {
+          // Check if this Google account already has a profile (already registered)
+          const { data: existingProfile } = await supabase
+            .from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+
+          if (existingProfile) {
+            const existingRole = existingProfile.role === 'dealer' ? 'detailer' : existingProfile.role as 'client' | 'detailer';
+
+            // Check whether this is a fully completed account (has sub-profile)
+            // or just an auto-created shell by the DB trigger (role defaults to 'client')
+            const { data: clientSub } = await supabase.from('client_profiles').select('id').eq('id', session.user.id).maybeSingle();
+            const { data: dealerSub } = await supabase.from('dealer_profiles').select('id').eq('id', session.user.id).maybeSingle();
+            const hasCompletedProfile = !!(clientSub || dealerSub);
+
+            if (hasCompletedProfile && existingRole !== d.role) {
+              // Real account with a different role — block
+              await supabase.auth.signOut();
+              const correct = existingRole === 'client' ? 'Client' : 'Detailer';
+              toast.error('Account already exists', {
+                description: `This Google account is already registered as a ${correct}. Please sign in as ${correct} instead.`,
+                duration: 7000,
+              });
+              return;
+            }
+
+            if (hasCompletedProfile && existingRole === d.role) {
+              // Fully registered with same role — just sign them in
+              toast.info('Account already exists — signing you in.');
+              const result = await loadProfileForUser(session.user);
+              await navigateAfterSignIn(result, existingRole, session);
+              return;
+            }
+
+            // Profile exists but no sub-profile = DB trigger auto-created it with
+            // default 'client' role. Update to the user's actual intended role and
+            // proceed to onboarding as normal.
+            await supabase.from('profiles').update({
+              role: d.role === 'detailer' ? 'dealer' : 'client',
+              name: d.name,
+              phone: d.phone,
+            }).eq('id', session.user.id);
+
+            setTempUserData({ userId: session.user.id, name: d.name, email, phone: d.phone, role: d.role });
+            setSelectedRole(d.role);
+            toast.success('Account created! Complete your profile.');
+            setTimeout(() => {
+              setCurrentView(d.role === 'client' ? 'onboarding-client' : 'onboarding-detailer');
+            }, 800);
+            return;
+          }
+
+          await createMinimalProfile({
+            userId: session.user.id,
+            name: d.name,
+            email,
+            phone: d.phone,
+            role: d.role === 'detailer' ? 'dealer' : 'client',
+          });
+          setTempUserData({ userId: session.user.id, name: d.name, email, phone: d.phone, role: d.role });
+          setSelectedRole(d.role);
+          toast.success('Account created! Complete your profile.');
+          setTimeout(() => {
+            setCurrentView(d.role === 'client' ? 'onboarding-client' : 'onboarding-detailer');
+          }, 800);
+        } catch (err: any) {
+          toast.error('Could not create profile', { description: err?.message });
+        }
+        return;
+      }
+
+      // ── Case B: Existing session (page reload) — restore user state ────────
+      if (!pendingRole) {
+        try {
+          const result = await loadProfileForUser(session.user);
+          const appRole = result.appRole === 'admin' ? 'detailer' : result.appRole;
+          await navigateAfterSignIn(result, appRole as 'client' | 'detailer', session);
+        } catch {
+          // Session invalid or profile missing — stay on welcome screen
+        }
+        return;
+      }
+
+      // ── Case C: Returning from Google sign-IN ────────────────────────────
+      localStorage.removeItem('pending_google_role');
+
+      try {
+        const result = await loadProfileForUser(session.user);
+        const actualRole = result.appRole === 'admin' ? 'detailer' : result.appRole;
+
+        // Role mismatch — block and show clear error (never silently change roles)
+        if (actualRole !== pendingRole) {
+          await supabase.auth.signOut();
+          const correctLabel = actualRole === 'client' ? 'Client' : 'Detailer';
+          const selectedLabel = pendingRole === 'client' ? 'Client' : 'Detailer';
+          toast.error(`Wrong role selected`, {
+            description: `This Google account is registered as a ${correctLabel}, but you tried to sign in as ${selectedLabel}. Please go back and select ${correctLabel}.`,
+            duration: 8000,
+          });
+          setCurrentView('welcome');
+          return;
+        }
+
+        await navigateAfterSignIn(result, pendingRole, session);
+      } catch (error: any) {
+        toast.error('Google sign-in failed', { description: error?.message ?? 'Please try again.' });
+      }
+    };
+
+    handleGoogleCallback();
+  }, []);
+
+  // Trigger Google OAuth for the currently selected role
+  // role arg is provided when called from WelcomeScreen directly;
+  // falls back to the already-set selectedRole when called from SignInScreen/SignUpScreen
+  const handleGoogleSignIn = async (role?: 'client' | 'detailer') => {
+    const effectiveRole = role ?? selectedRole;
+    if (!effectiveRole) {
+      toast.error('Please select a role first');
+      return;
+    }
+    if (role) {
+      // Coming from WelcomeScreen — set the role so the rest of the app knows it
+      setSelectedRole(role);
+    }
+    try {
+      await signInWithGoogle(effectiveRole);
+      // Browser will redirect to Google — execution stops here
+    } catch (error: any) {
+      toast.error('Google sign-in failed', {
+        description: error?.message ?? 'Please try again.',
+      });
+    }
+  };
+
+  // Handle role selection from welcome screen (Continue button clicked)
+  const handleContinueFromWelcome = (
+    role: "client" | "detailer",
+  ) => {
+    setSelectedRole(role);
+    setCurrentView("signin");
+    setAuthFlow("signin");
+
+    // Analytics anchor
+    console.log("Analytics: sign_in_role_selected", { role });
+  };
+
+  // Handle role change from sign-in/sign-up screens
+  const handleChangeRole = () => {
+    setCurrentView("welcome");
+    setSelectedRole(null);
+  };
+
+  // Handle sign in
+  const handleSignIn = async (
+      email: string,
+      password: string,
+      selectedRole: "client" | "detailer",
+    ) => {
+      try {
+        const result = await signInAndLoadProfile(email, password);
+
+        // Validate that the selected role matches the actual user role in database
+        const actualRole = result.appRole === "admin" ? "detailer" : result.appRole;
+
+        if (selectedRole !== actualRole) {
+          // Role mismatch - user selected wrong role
+          const roleNames = {
+            client: "Client",
+            detailer: "Detailer"
+          };
+
+          toast.error("Role Mismatch", {
+            description: `This account is registered as a ${roleNames[actualRole]}. Please go back and select the correct role, or sign up for a new ${roleNames[selectedRole]} account.`,
+            duration: 6000,
+          });
+          throw new Error("Role mismatch");
+        }
+
+        if (result.appRole === "client") {
+          if (!result.clientProfile) {
+            setTempUserData({
+              userId: result.user.id,
+              name: result.profile.name,
+              email: result.profile.email,
+              phone: result.profile.phone ?? "",
+              role: "client",
+            });
+            const clientUser: Customer & { role: "client" } = {
+              id: result.profile.id,
+              role: "client",
+              email: result.profile.email,
+              phone: result.profile.phone ?? "",
+              name: result.profile.name,
+              location: "Unknown",
+              createdAt: new Date(result.profile.created_at ?? new Date()),
+              avatar: result.profile.avatar_url ?? undefined,
+              vehicles: [],
+            };
+            setCurrentUser(clientUser);
+            setCurrentView("onboarding-client");
+            toast.success("Welcome back! Please complete your profile.");
+            return;
+          }
+          const clientUser: Customer & { role: "client" } = {
+            id: result.profile.id,
+            role: "client",
+            email: result.profile.email,
+            phone: result.profile.phone ?? "",
+            name: result.profile.name,
+            location: result.clientProfile?.base_location ?? "Unknown",
+            createdAt: new Date(result.profile.created_at ?? new Date()),
+            avatar: result.profile.avatar_url ?? undefined,
+            vehicles: result.clientProfile?.vehicle_make
+              ? [
+                  {
+                    id: "1",
+                    make: result.clientProfile.vehicle_make,
+                    model: result.clientProfile.vehicle_model ?? "",
+                    year: result.clientProfile.vehicle_year ?? new Date().getFullYear(),
+                    type: "Sedan",
+                    isDefault: true,
+                  },
+                ]
+              : [],
+          };
+          setCurrentUser(clientUser);
+          setCurrentView("marketplace");
+          toast.success("Signed in as client");
+        } else if (result.appRole === "detailer") {
+          const dealer = result.dealerProfile;
+          if (!dealer) {
+            setTempUserData({
+              userId: result.user.id,
+              name: result.profile.name,
+              email: result.profile.email,
+              phone: result.profile.phone ?? "",
+              role: "detailer",
+            });
+            const detailerUser: Detailer & { role: "detailer" } = {
+              id: result.profile.id,
+              role: "detailer",
+              email: result.profile.email,
+              phone: result.profile.phone ?? "",
+              name: result.profile.name,
+              businessName: "My Detailing Business",
+              bio: "Complete your profile to get started.",
+              avatar:
+                result.profile.avatar_url ??
+                "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80",
+              location: "Unknown",
+              serviceRadius: 15,
+              priceRange: "$",
+              rating: 0,
+              photos: [],
+              services: [],
+              specialties: [],
+              isPro: false,
+              wallet: 0,
+              completedJobs: 0,
+              createdAt: new Date(result.profile.created_at ?? new Date()),
+            };
+            setCurrentUser(detailerUser);
+            setCurrentView("onboarding-detailer");
+            toast.success("Welcome back! Please complete your business details.");
+            return;
+          }
+          // Fetch completed jobs count from orders table
+          const { count: completedJobsCount } = await supabase
+            .from('orders')
+            .select('*', { count: 'exact', head: true })
+            .eq('dealer_id', result.profile.id)
+            .eq('status', 'completed');
+          
+          const detailerUser: Detailer & { role: "detailer" } = {
+            id: result.profile.id,
+            role: "detailer",
+            email: result.profile.email,
+            phone: result.profile.phone ?? "",
+            name: result.profile.name,
+            businessName: dealer?.business_name ?? "My Detailing Business",
+            bio: `Welcome to ${dealer?.business_name ?? "our detailing business"}! We offer premium auto detailing services.`,
+            avatar:
+              result.profile.avatar_url ??
+              "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80",
+            location: dealer?.base_location ?? "Unknown",
+            serviceRadius:
+              (dealer?.services_offered as any)?.serviceRadius ?? 15,
+            priceRange: dealer?.price_range ?? "$",
+            rating: Number(dealer?.rating ?? 0), // Use real rating from database
+            photos: [],
+            services:
+              ((dealer?.services_offered as any)?.specialties as string[]) ?? [],
+            specialties:
+              ((dealer?.services_offered as any)?.specialties as string[]) ?? [],
+            isPro: false,
+            wallet: 0,
+            completedJobs: completedJobsCount ?? 0, // Use real count from orders
+            createdAt: new Date(result.profile.created_at ?? new Date()),
+          };
+          setCurrentUser(detailerUser);
+          setCurrentView("pro-dashboard");
+          toast.success("Signed in as detailer");
+        } else {
+          toast.error("Unsupported role");
+        }
+      } catch (error: any) {
+        toast.error("Sign-in failed", {
+          description: error?.message ?? "Please check your credentials.",
+        });
+        throw error;
+      }
+    }
+
+  // Handle sign up
+  const handleGoogleSignUp = async (data: { name: string; phone: string; role: 'client' | 'detailer' }) => {
+    try {
+      await signUpWithGoogle(data);
+      // Browser redirects to Google — execution stops here
+    } catch (error: any) {
+      toast.error('Google sign-up failed', { description: error?.message ?? 'Please try again.' });
+    }
+  };
+
+  // Handle client onboarding completion
+  const handleClientOnboardingComplete = async (data: {
+    location: string;
+    location_lat: number | null;
+    location_lng: number | null;
+    vehicle?: { make: string; model: string; year: number };
+    notifications: boolean;
+    avatarUrl?: string;
+  }) => {
+    if (!tempUserData) return;
+    try {
+      await createClientProfile({
+        userId: tempUserData.userId,
+        name: tempUserData.name,
+        email: tempUserData.email,
+        phone: tempUserData.phone,
+        location_lat: data.location_lat,
+        location_lng: data.location_lng,
+        vehicle: data.vehicle,
+      });
+
+      const user: Customer & { role: "client" } = {
+        id: tempUserData.userId,
+        role: "client",
+        email: tempUserData.email,
+        phone: tempUserData.phone,
+        name: tempUserData.name,
+        location: data.location,
+        createdAt: new Date(),
+        avatar: data.avatarUrl, // Add avatar URL
+        vehicles: data.vehicle
+          ? [
+              {
+                id: "1",
+                make: data.vehicle.make,
+                model: data.vehicle.model,
+                year: data.vehicle.year,
+                type: "Sedan",
+                isDefault: true,
+              },
+            ]
+          : [],
+      };
+
+      setCurrentUser(user);
+      setCurrentView("marketplace");
+      toast.success(`Welcome to InDetail, ${user.name}!`, {
+        description: "Your account is ready to use.",
+      });
+
+      console.log("Analytics: onboarding_completed", {
+        role: "client",
+      });
+    } catch (error: any) {
+      toast.error("Could not complete client onboarding", {
+        description: error?.message ?? "Please try again.",
+      });
+    }
+  };
+
+  // Handle detailer onboarding completion
+  const handleDetailerOnboardingComplete = async (data: {
+    businessName: string;
+    serviceRadius: number;
+    location: string;
+    locationLat: number;
+    locationLng: number;
+    specialties: string[];
+    priceRange: string;
+    portfolioImages?: string[];
+    logoUrl?: string;
+  }) => {
+    if (!tempUserData) return;
+
+    try {
+      await createDealerProfile({
+        userId: tempUserData.userId,
+        name: tempUserData.name,
+        email: tempUserData.email,
+        phone: tempUserData.phone,
+        businessName: data.businessName,
+        baseLocation: data.location,
+        locationLat: data.locationLat,
+        locationLng: data.locationLng,
+        serviceRadius: data.serviceRadius,
+        priceRange: data.priceRange,
+        specialties: data.specialties,
+        portfolioImages: data.portfolioImages,
+        logoUrl: data.logoUrl,
+      });
+
+      const user: Detailer & { role: "detailer" } = {
+        id: tempUserData.userId,
+        role: "detailer",
+        email: tempUserData.email,
+        phone: tempUserData.phone,
+        name: tempUserData.name,
+        businessName: data.businessName,
+        bio: `Welcome to ${data.businessName}! We offer premium auto detailing services.`,
+        avatar:
+          "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80",
+        location: data.location,
+        serviceRadius: data.serviceRadius,
+        priceRange: data.priceRange,
+        rating: 0,
+        photos: data.portfolioImages ?? [],
+        services: data.specialties,
+        specialties: data.specialties,
+        isPro: false,
+        wallet: 5,
+        completedJobs: 0,
+        createdAt: new Date(),
+      };
+
+      setCurrentUser(user);
+      setCurrentView("pro-dashboard");
+      toast.success(`Welcome to InDetail, ${user.name}!`, {
+        description: "Your business profile is ready.",
+      });
+
+      console.log("Analytics: onboarding_completed", {
+        role: "detailer",
+      });
+    } catch (error: any) {
+      toast.error("Could not complete detailer onboarding", {
+        description: error?.message ?? "Please try again.",
+      });
+    }
+  };
+
+  // Handle Pro navigation
+  const handleProNavigate = (view: string, params?: any) => {
+    if (view === 'settings') {
+      setCurrentView('settings');
+      setProNavParams(params || {});
+      return;
+    }
+    const viewMap: Record<string, View> = {
+      'pro-dashboard': 'pro-dashboard',
+      'dashboard': 'pro-dashboard',
+      'pro-profile-editor': 'settings',
+      'profile-editor': 'settings',
+      'pro-public-profile': 'pro-public-profile',
+      'public-profile': 'pro-public-profile',
+      'pro-lead-inbox': 'pro-lead-inbox',
+      'lead-inbox': 'pro-lead-inbox',
+      'orders-queue': 'orders-queue',
+    };
+
+    const mappedView = viewMap[view] || 'pro-dashboard';
+    setCurrentView(mappedView as View);
+    setProNavParams(params || {});
+  };
+  
+  // Handle accept lead
+  const handleAcceptLead = (leadId: string) => {
+    if (!currentUser || currentUser.role !== 'detailer') return;
+    
+    const lead = mockLeads.find(l => l.id === leadId);
+    if (!lead) return;
+    
+    const detailer = currentUser as Detailer;
+    
+    // Check if detailer has enough credits
+    if (detailer.wallet < lead.cost) {
+      toast.error('Insufficient credits', {
+        description: 'Please add more credits to accept this lead.',
+      });
+      return;
+    }
+    
+    // Deduct credits from wallet
+    setCurrentUser({
+      ...detailer,
+      wallet: detailer.wallet - lead.cost,
+    });
+    
+    // Update lead status
+    setMockLeads(prev => prev.map(l => 
+      l.id === leadId ? { ...l, status: 'accepted' as const } : l
+    ));
+    
+    toast.success('Lead accepted!', {
+      description: `$${lead.cost} deducted from your wallet.`,
+    });
+    
+    // Navigate to messages to start conversation
+    setTimeout(() => {
+      setCurrentView('messages');
+    }, 1500);
+  };
+  
+  // Handle decline lead
+  const handleDeclineLead = (leadId: string) => {
+    setMockLeads(prev => prev.map(l => 
+      l.id === leadId ? { ...l, status: 'declined' as const } : l
+    ));
+    
+    toast.info('Lead declined');
+  };
+  
+  // Handle add credits
+  const handleAddCredits = (credits: number) => {
+    if (!currentUser || currentUser.role !== 'detailer') return;
+    
+    const detailer = currentUser as Detailer;
+    setCurrentUser({
+      ...detailer,
+      wallet: detailer.wallet + credits,
+    });
+    
+    toast.success(`Added $${credits} to your wallet!`);
+  };
+  
+  // Handle upgrade to Pro
+  const handleUpgradeToPro = () => {
+    if (!currentUser || currentUser.role !== 'detailer') return;
+    
+    const detailer = currentUser as Detailer;
+    setCurrentUser({
+      ...detailer,
+      isPro: true,
+    });
+    
+    toast.success('Upgraded to Pro!', {
+      description: 'You now get priority placement and cheaper leads.',
+    });
+  };
+  
+  // Handle navigation
+  const handleNavigate = (view: string) => {
+    if (view !== "messages") setViewingConversationId(null);
+    switch (view) {
+      case "home":
+        setCurrentView(
+          currentUser?.role === "detailer"
+            ? "pro-dashboard" // Use Pro Dashboard for detailers
+            : "marketplace",
+        );
+        break;
+      case "messages":
+        setCurrentView("messages");
+        break;
+      case "bookings":
+        setCurrentView("bookings");
+        break;
+      case "my-orders":
+        setCurrentView("my-orders");
+        break;
+      case "status":
+        setCurrentView("status");
+        break;
+      case "profile":
+        setCurrentView("profile");
+        break;
+      case "pro-public-profile":
+        setCurrentView("pro-public-profile");
+        break;
+      case "quotes":
+        setCurrentView("quotes");
+        break;
+      case "alerts":
+        setCurrentView("alerts");
+        break;
+      case "settings":
+        setCurrentView("settings");
+        break;
+      case "notifications":
+        setCurrentView("notifications");
+        break;
+      case "stripe-test":
+        setCurrentView("stripe-test");
+        break;
+    }
+  };
+
+  // Handle view job status
+  const handleViewStatus = (bookingId: string) => {
+    setSelectedBookingId(bookingId);
+    setCurrentView("job-status");
+  };
+
+  // Handle back from job status
+  const handleBackFromStatus = () => {
+    setSelectedBookingId(null);
+    setCurrentView("bookings");
+  };
+
+  const handleBackToWelcome = () => {
+    setCurrentView("welcome");
+    setSelectedRole(null);
+  };
+
+  const handleSwitchAuthFlow = () => {
+    setAuthFlow(authFlow === "signin" ? "signup" : "signin");
+    setCurrentView(authFlow === "signin" ? "signup" : "signin");
+  };
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      clearUser();
+      setCurrentView("welcome");
+      setSelectedRole(null);
+      toast.success("You have been signed out.");
+    } catch {
+      clearUser();
+      setCurrentView("welcome");
+      setSelectedRole(null);
+      toast.success("You have been signed out.");
+    }
+  };
+
+  // Email verification pending screen
+  // Welcome screen
+  if (currentView === "welcome") {
+    return (
+      <>
+        <Toaster position="top-center" richColors />
+        <WelcomeScreen
+          onContinue={handleContinueFromWelcome}
+          onViewTerms={() => setCurrentView("terms")}
+          onViewPrivacy={() => setCurrentView("privacy")}
+        />
+      </>
+    );
+  }
+
+  // Terms of Service
+  if (currentView === "terms") {
+    return (
+      <>
+        <Toaster position="top-center" richColors />
+        <TermsOfService onBack={handleBackToWelcome} />
+      </>
+    );
+  }
+
+  // Privacy Policy
+  if (currentView === "privacy") {
+    return (
+      <>
+        <Toaster position="top-center" richColors />
+        <PrivacyPolicy onBack={handleBackToWelcome} />
+      </>
+    );
+  }
+
+  // Sign in screen
+  if (currentView === "signin" && selectedRole) {
+    return (
+      <>
+        <Toaster position="top-center" richColors />
+        <SignInScreen
+          role={selectedRole}
+          onBack={handleBackToWelcome}
+          onSignIn={handleSignIn}
+          onGoogleSignIn={handleGoogleSignIn}
+          onSwitchToSignUp={handleSwitchAuthFlow}
+          onChangeRole={handleChangeRole}
+        />
+      </>
+    );
+  }
+
+  // Sign up screen
+  if (currentView === "signup" && selectedRole) {
+    return (
+      <>
+        <Toaster position="top-center" richColors />
+        <SignUpScreen
+          role={selectedRole}
+          onBack={handleBackToWelcome}
+          onGoogleSignUp={handleGoogleSignUp}
+          onSwitchToSignIn={handleSwitchAuthFlow}
+          onChangeRole={handleChangeRole}
+        />
+      </>
+    );
+  }
+
+  // Client onboarding
+  if (currentView === "onboarding-client" && tempUserData) {
+    return (
+      <>
+        <Toaster position="top-center" richColors />
+        <ClientOnboarding
+          userName={tempUserData.name}
+          userId={tempUserData.userId}
+          onComplete={handleClientOnboardingComplete}
+        />
+      </>
+    );
+  }
+
+  // Detailer onboarding
+  if (currentView === "onboarding-detailer" && tempUserData) {
+    return (
+      <>
+        <Toaster position="top-center" richColors />
+        <DetailerOnboarding
+          userName={tempUserData.name}
+          userId={tempUserData.userId}
+          onComplete={handleDetailerOnboardingComplete}
+        />
+      </>
+    );
+  }
+
+  // Main app (after authentication)
+  if (!currentUser) {
+    // Shouldn't reach here, but redirect to welcome if no user
+    setCurrentView("welcome");
+    return null;
+  }
+
+  // Views that should NOT have the web layout (full screen views)
+  const fullScreenViews = [
+    "job-status",
+    "detailer-profile", 
+    "request-quote",
+    "pro-public-profile",
+    "pro-lead-inbox",
+    "orders-queue"
+  ];
+
+  const shouldUseWebLayout = !fullScreenViews.includes(currentView);
+
+  // Determine if we should show profile sidebar (only for clients in marketplace/home)
+  const shouldShowProfileSidebar = currentUser.role === "client" && 
+    (currentView === "marketplace" || currentView === "home");
+
+  const mainContent = (
+    <>
+      {/* Marketplace (Client Home) */}
+      {currentView === "marketplace" &&
+        currentUser.role === "client" && (
+          <>
+            <MarketplaceSearchEnhanced
+              detailers={displayDetailers}
+              searchQuery={dealerSearchQuery}
+              onSearchChange={setDealerSearchQuery}
+              sortBy={sortBy}
+              onSortByChange={setSortBy}
+              priceFilter={priceFilter}
+              onPriceFilterChange={setPriceFilter}
+              serviceFilter={serviceFilter}
+              onServiceFilterChange={setServiceFilter}
+              onSelectDetailer={(detailer) => {
+                setSelectedDetailerId(detailer.id);
+                setCurrentView("detailer-profile");
+              }}
+              onRequestQuote={(detailer) => {
+                setSelectedDetailerId(detailer.id);
+                if (currentUser.role === "client") {
+                  setOrderModalOpen(true);
+                } else {
+                  setCurrentView("request-quote");
+                }
+              }}
+            />
+            <DebugDataSource 
+              detailersCount={displayDetailers.length}
+              isFromSupabase={detailers.length > 0}
+            />
+          </>
+        )}
+
+      {/* Dashboard (Detailer Home) */}
+      {currentView === "dashboard" &&
+        currentUser.role === "detailer" && (
+          <DetailerDashboardEnhanced
+            detailer={currentUser as Detailer}
+            leads={mockLeads}
+            onAcceptLead={handleAcceptLead}
+            onDeclineLead={handleDeclineLead}
+            onUpgradeToPro={handleUpgradeToPro}
+            onCreditsAdded={handleAddCredits}
+            onNavigateToDemo={() =>
+              setCurrentView("status-demo")
+            }
+          />
+        )}
+
+      {/* PRO Dashboard (New Brand Growth Features) */}
+      {currentView === "pro-dashboard" &&
+        currentUser.role === "detailer" && (
+          <ProDashboard onNavigate={handleProNavigate} />
+        )}
+
+      {/* PRO Public Profile (Preview for detailer) */}
+      {currentView === "pro-public-profile" && (
+          <div className="h-full flex flex-col min-h-0">
+            <ProPublicProfile onNavigate={handleProNavigate} />
+          </div>
+        )}
+
+      {/* PRO Lead Inbox */}
+      {currentView === "pro-lead-inbox" &&
+        currentUser.role === "detailer" && (
+          <div className="h-full overflow-hidden">
+            <ProLeadInbox />
+          </div>
+        )}
+
+      {/* Status Demo (Detailer Only) */}
+      {currentView === "status-demo" && (
+        <RoleGuard
+          allowedRole="detailer"
+          currentRole={
+            currentUser.role === "detailer"
+              ? "detailer"
+              : "client"
+          }
+          onRedirect={() =>
+            setCurrentView(
+              currentUser.role === "detailer"
+                ? "dashboard"
+                : "marketplace",
+            )
+          }
+        >
+          <StatusDemoPage
+            onBack={() => setCurrentView("dashboard")}
+          />
+        </RoleGuard>
+      )}
+
+      {/* Messages */}
+      {currentView === "messages" && (
+        <div className="h-full overflow-hidden">
+          <MessagesPageIntegrated
+            userId={currentUser.id}
+            userRole={currentUser.role}
+            dealerIdToOpen={dealerIdToOpen}
+            onViewingConversation={setViewingConversationId}
+            onMarkAsRead={markAsRead}
+          />
+        </div>
+      )}
+
+      {/* Bookings */}
+      {currentView === "bookings" && (
+        <div className="h-full overflow-y-auto">
+          {currentUser.role === "client" ? (
+            <BookingsPageIntegrated
+              clientId={currentUser.id}
+              onNavigateToMessages={({ dealerId }) => {
+                setDealerIdToOpen(dealerId);
+                setCurrentView("messages");
+                toast.info("Opening conversation...");
+              }}
+              onViewStatus={handleViewStatus}
+              onRequestQuote={() => setCurrentView("marketplace")}
+            />
+          ) : (
+            <div className="max-w-4xl mx-auto p-6">
+              <DealerOrdersQueue dealerId={currentUser.id} onNavigate={(v) => setCurrentView(v as View)} />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Job Status */}
+      {currentView === "job-status" && selectedBookingId && (
+        <div className="h-full overflow-hidden">
+          {currentUser.role === "client" ? (
+            <ClientJobStatusPage
+              bookingId={selectedBookingId}
+              onBack={handleBackFromStatus}
+              onNavigateToMessages={() => {
+                setDealerIdToOpen(undefined);
+                setCurrentView("messages");
+                toast.info("Opening conversation...");
+              }}
+            />
+          ) : (
+            <DetailerJobStatusPage
+              bookingId={selectedBookingId}
+              onBack={handleBackFromStatus}
+              onNavigateToMessages={() => {
+                setCurrentView("messages");
+                toast.info("Opening conversation...");
+              }}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Status Center */}
+      {currentView === "status" && (
+        <div className="h-full overflow-hidden">
+          <StatusCenter
+            role={currentUser.role}
+            userId={currentUser.id}
+            onNavigateToMessages={(params) => {
+              setDealerIdToOpen(params?.dealerId ?? null);
+              setCurrentView("messages");
+              toast.info("Opening conversation...");
+            }}
+          />
+        </div>
+      )}
+
+      {/* Profile */}
+      {currentView === "profile" && (
+        <div className="h-full overflow-hidden">
+          <ProfileRoleAware role={currentUser.role} onNavigate={handleProNavigate} />
+        </div>
+      )}
+
+      {/* Quotes Page */}
+      {currentView === "quotes" && (
+        <div className="p-6">
+          <div className="max-w-4xl mx-auto">
+            <h1 className="text-2xl font-bold text-gray-900 mb-6">Quotes</h1>
+            <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+              <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500 mb-2">No quotes yet</p>
+              <p className="text-sm text-gray-400">Your quote requests will appear here</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Alerts Page */}
+      {currentView === "alerts" && (
+        <div className="p-6">
+          <div className="max-w-4xl mx-auto">
+            <h1 className="text-2xl font-bold text-gray-900 mb-6">Elev Alerts</h1>
+            <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+              <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500 mb-2">No alerts</p>
+              <p className="text-sm text-gray-400">Important notifications will appear here</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Page */}
+      {currentView === "settings" && (
+        <div className="h-full overflow-auto">
+          {currentUser.role === "detailer" ? (
+            <DealerSettings
+              onNavigate={(v) => setCurrentView(v as View)}
+              initialTab={proNavParams?.tab}
+            />
+          ) : (
+            <ClientSettings />
+          )}
+        </div>
+      )}
+
+      {/* Notifications Page */}
+      {currentView === "notifications" && currentUser && (
+        <NotificationsPage
+          userId={currentUser.id}
+          onNavigate={(link) => {
+            // Parse link and navigate accordingly
+            if (link.startsWith('/')) {
+              const view = link.substring(1) as View;
+              setCurrentView(view);
+            }
+          }}
+        />
+      )}
+
+      {/* Stripe Test Page */}
+      {currentView === "stripe-test" && (
+        <StripeTestPage />
+      )}
+
+      {/* Detailer Profile (Public - same layout as dealer View Gig) */}
+      {currentView === "detailer-profile" && selectedDetailerId && (
+        <ProPublicProfile
+          detailer={displayDetailers.find(d => d.id === selectedDetailerId) || displayDetailers[0]}
+          onBack={() => setCurrentView("marketplace")}
+          onRequestQuote={(selectedServices: { id: string; name: string; price?: number }[]) => {
+            setPreselectedServices(selectedServices);
+            if (currentUser.role === "client") {
+              setOrderModalOpen(true);
+            } else {
+              setCurrentView("request-quote");
+              toast.info("Request a quote from this detailer");
+
+            }
+          }}
+          onMessage={() => {
+            setDealerIdToOpen(selectedDetailerId);
+            setCurrentView("messages");
+            toast.info("Opening conversation...");
+          }}
+        />
+      )}
+
+      {/* Order Placement Modal (Client) */}
+      {currentUser.role === "client" && selectedDetailerId && (
+        <OrderPlacementModal
+          open={orderModalOpen}
+          onOpenChange={(open) => {
+            setOrderModalOpen(open);
+            if (!open) setPreselectedServices([]);
+          }}
+          detailer={displayDetailers.find(d => d.id === selectedDetailerId) || displayDetailers[0]}
+          clientId={currentUser.id}
+          clientVehicles={(currentUser as Customer).vehicles ?? []}
+          initialSelectedServices={preselectedServices}
+          onSuccess={() => {
+            toast.success("Order placed successfully!");
+            setCurrentView("my-orders");
+          }}
+          onError={(msg) => toast.error(msg)}
+        />
+      )}
+
+      {/* Request Quote Form (legacy / non-order flow) */}
+      {currentView === "request-quote" && selectedDetailerId && currentUser.role === "client" && (
+        <BookingRequestForm
+          detailer={displayDetailers.find(d => d.id === selectedDetailerId) || displayDetailers[0]}
+          onBack={() => setCurrentView("marketplace")}
+          onSubmit={(data) => {
+            console.log("Quote request submitted:", data);
+            toast.success("Quote request sent!");
+            setCurrentView("bookings");
+          }}
+        />
+      )}
+
+      {/* My Orders (Client) */}
+      {currentView === "my-orders" && currentUser.role === "client" && (
+        <ClientOrdersPage clientId={currentUser.id} />
+      )}
+
+      {/* Orders Queue (Dealer) */}
+      {currentView === "orders-queue" && currentUser.role === "detailer" && (
+        <div className="h-full overflow-auto">
+          <div className="sticky top-0 z-10 bg-white border-b px-4 py-3 flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={() => setCurrentView("pro-dashboard")}>
+              <ArrowLeft className="w-5 h-5 mr-1" />
+              Back
+            </Button>
+          </div>
+          <div className="p-6">
+            <DealerOrdersQueue dealerId={currentUser.id} onNavigate={(v) => setCurrentView(v as View)} />
+          </div>
+        </div>
+      )}
+    </>
+  );
+
+  return (
+    <>
+      <Toaster position="top-center" richColors />
+      
+      {shouldUseWebLayout ? (
+        <WebLayout
+          currentView={currentView}
+          onNavigate={handleNavigate}
+          userName={currentUser.name}
+          businessName={currentUser.role === 'detailer' ? (currentUser as Detailer).businessName : undefined}
+          userEmail={currentUser.email}
+          userPhone={currentUser.phone}
+          userRole={currentUser.role}
+          clientId={currentUser.role === 'client' ? currentUser.id : undefined}
+          dealerLogoUrl={currentUser.role === 'detailer' ? dealerProfile?.logo_url : undefined}
+          clientAvatarUrl={currentUser.role === 'client' ? (currentUser as Customer).avatar : undefined}
+          vehicles={currentUser.role === 'client' ? (currentUser as Customer).vehicles ?? [] : []}
+          showProfileSidebar={shouldShowProfileSidebar}
+          onLogout={handleLogout}
+          unreadMessages={unreadCount}
+          unreadNotifications={unreadNotifications}
+        >
+          {mainContent}
+        </WebLayout>
+      ) : (
+        <div className="h-screen w-full bg-white relative">
+          {mainContent}
+        </div>
+      )}
+    </>
+  );
+}

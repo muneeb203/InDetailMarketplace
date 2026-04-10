@@ -1,0 +1,474 @@
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Play, Star, Instagram, Facebook, Mail } from 'lucide-react';
+import { BrandHeader } from './BrandHeader';
+import { BeforeAfterCarousel } from './BeforeAfterCarousel';
+import { GalleryLightbox } from './GalleryLightbox';
+import { useAuth } from '../../context/AuthContext';
+import { useDealerProfile } from '../../hooks/useDealerProfile';
+import { fetchDealerSocialLinks, type SocialPlatform } from '../../services/dealerSocialService';
+import { getDealerCompletedOrdersCount } from '../../services/orderService';
+import { fetchDealerReviews, fetchDealerRating } from '../../services/dealerReviewService';
+import { getDetailerOfferings } from '../../services/serviceOfferingService';
+import type { Detailer } from '../../types';
+import type { ServiceOfferingWithPrices } from '../../types/serviceTypes';
+
+// Helper to get navigation functions (works with or without react-router)
+function useNav() {
+  try {
+    const { useNavigate: rUseNavigate } = require('react-router-dom');
+    return rUseNavigate();
+  } catch {
+    return (path: string | number) => {
+      if (path === -1) {
+        window.history.back();
+      }
+    };
+  }
+}
+
+interface ProPublicProfileProps {
+  onNavigate?: (view: string, params?: any) => void;
+  /** When provided (client viewing a gig), use this detailer's data and show client CTAs */
+  detailer?: Detailer;
+  onBack?: () => void;
+  onRequestQuote?: (selectedServices: { id: string; name: string; price?: number }[]) => void;
+  onMessage?: () => void;
+}
+
+export function ProPublicProfile({ onNavigate, detailer: detailerProp, onBack, onRequestQuote, onMessage }: ProPublicProfileProps = {}) {
+  const navigate = useNav();
+  const { currentUser } = useAuth();
+  const isClientView = !!detailerProp;
+  const dealerId = isClientView ? detailerProp!.id : (currentUser?.role === 'detailer' ? currentUser.id : undefined);
+  const { data: dealerProfile } = useDealerProfile(
+    !isClientView && currentUser?.role === 'detailer' ? currentUser.id : undefined
+  );
+  const [showGallery, setShowGallery] = useState(false);
+  const [socialLinks, setSocialLinks] = useState<{ platform: SocialPlatform; url: string }[]>([]);
+  const [completedJobs, setCompletedJobs] = useState<number>(0);
+  const [reviews, setReviews] = useState<{ id: string; rating: number; review_text: string | null; created_at: string; client_name?: string }[]>([]);
+  const [dealerRating, setDealerRating] = useState<{ rating: number; review_count: number } | null>(null);
+  const [serviceOfferings, setServiceOfferings] = useState<ServiceOfferingWithPrices[]>([]);
+  const [selectedOfferingIds, setSelectedOfferingIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (dealerId) {
+      fetchDealerSocialLinks(dealerId)
+        .then((rows) => setSocialLinks(rows.map((r) => ({ platform: r.platform, url: r.url }))))
+        .catch(() => setSocialLinks([]));
+    }
+  }, [dealerId]);
+
+  useEffect(() => {
+    if (dealerId && !isClientView) {
+      getDealerCompletedOrdersCount(dealerId).then(setCompletedJobs);
+    } else if (detailerProp) {
+      setCompletedJobs(detailerProp.completedJobs ?? 0);
+    }
+  }, [dealerId, isClientView, detailerProp]);
+
+  useEffect(() => {
+    if (dealerId) {
+      fetchDealerReviews(dealerId).then(setReviews).catch(() => setReviews([]));
+      fetchDealerRating(dealerId).then(setDealerRating).catch(() => setDealerRating(null));
+      getDetailerOfferings(dealerId).then(setServiceOfferings).catch(() => setServiceOfferings([]));
+    }
+  }, [dealerId]);
+  
+  const handleBack = () => {
+    if (isClientView && onBack) {
+      onBack();
+    } else if (onNavigate) {
+      onNavigate('settings');
+    } else {
+      navigate(-1);
+    }
+  };
+
+  const serviceRadius = isClientView
+    ? (detailerProp!.serviceRadius ?? 10)
+    : (dealerProfile?.service_radius_miles ?? (dealerProfile?.services_offered as { serviceRadius?: number })?.serviceRadius ?? 10);
+  
+  // Get service names from active offerings for the service tags
+  const dealerServices = serviceOfferings
+    .filter(offering => offering.is_active)
+    .map(offering => offering.service.name);
+
+  // Build BrandHeader-compatible object
+  const detailer = isClientView ? {
+    logo: detailerProp!.logo ?? detailerProp!.avatar,
+    shopName: detailerProp!.businessName ?? 'Detailer',
+    tagline: detailerProp!.tagline ?? 'Perfection in every detail',
+    city: detailerProp!.location ?? 'Set your location',
+    radiusBadge: `${serviceRadius} mi radius`,
+    serviceTags: dealerServices,
+    badges: { verified: !!detailerProp!.isVerified, insured: !!detailerProp!.isInsured },
+    rating: dealerRating?.rating ?? detailerProp!.rating ?? 0,
+    jobCount: completedJobs,
+  } : {
+    logo: dealerProfile?.logo_url ?? undefined,
+    shopName: dealerProfile?.business_name ?? 'Elite Auto Detailing',
+    tagline: 'Perfection in every detail',
+    city: dealerProfile?.base_location ?? 'Set your location',
+    radiusBadge: `${serviceRadius} mi radius`,
+    serviceTags: dealerServices,
+    badges: { verified: true, insured: true },
+    rating: dealerRating?.rating ?? 0,
+    jobCount: completedJobs,
+  };
+
+  const portfolioItems = isClientView && detailerProp!.beforeAfterPhotos?.length
+    ? detailerProp!.beforeAfterPhotos.map((p, i) => ({
+        id: p.id ?? String(i),
+        before: p.beforeUrl,
+        after: p.afterUrl,
+        caption: p.description ?? p.category ?? '',
+        tags: p.category ? [p.category] : [],
+      }))
+    : (isClientView && (detailerProp!.photos?.length || detailerProp!.portfolioImages?.length))
+    ? ((detailerProp!.photos?.length ? detailerProp!.photos : detailerProp!.portfolioImages?.map((p) => p.url) ?? [])).map((url, i) => ({
+        id: String(i),
+        before: url,
+        after: url,
+        caption: 'Portfolio',
+        tags: [] as string[],
+      }))
+    : (dealerProfile?.portfolio_images?.length
+        ? dealerProfile.portfolio_images.map((url, i) => ({
+            id: String(i),
+            before: url,
+            after: url,
+            caption: 'Portfolio',
+            tags: [] as string[],
+          }))
+        : []);
+
+  const bioContent = isClientView ? detailerProp!.bio : undefined;
+  const yearsInBusiness = isClientView ? detailerProp!.yearsInBusiness : undefined;
+  const certifications = isClientView ? detailerProp!.certifications : undefined;
+
+  // Format services with pricing from service offerings
+  const formatPrice = (prices: any[], pricingModel: string) => {
+    if (!prices || prices.length === 0) return 'Custom';
+    
+    if (pricingModel === 'single') {
+      return `$${prices[0].price.toFixed(2)}`;
+    } else {
+      // Multi-tier: show price range
+      const priceValues = prices.map(p => p.price);
+      const minPrice = Math.min(...priceValues);
+      const maxPrice = Math.max(...priceValues);
+      return `$${minPrice.toFixed(2)} - $${maxPrice.toFixed(2)}`;
+    }
+  };
+
+  /** Numeric price for checkout: single = first price; multi-tier = min price */
+  const getNumericPrice = (offering: ServiceOfferingWithPrices): number => {
+    if (!offering.prices || offering.prices.length === 0) return 0;
+    if (offering.pricing_model === 'single') return offering.prices[0].price;
+    return Math.min(...offering.prices.map((p) => p.price));
+  };
+
+  const services = serviceOfferings
+    .filter(offering => offering.is_active)
+    .map(offering => {
+      const formattedPrice = formatPrice(offering.prices, offering.pricing_model);
+      // Get the numeric price for calculations
+      let numericPrice = 0;
+      if (offering.prices && offering.prices.length > 0) {
+        if (offering.pricing_model === 'single') {
+          numericPrice = offering.prices[0].price;
+        } else {
+          // For multi-tier, use the minimum price
+          numericPrice = Math.min(...offering.prices.map(p => p.price));
+        }
+      }
+      
+      return {
+        id: offering.id,
+        name: offering.service.name,
+        description: offering.service.description,
+        price: formattedPrice,
+        numericPrice: numericPrice,
+        pricingNote: offering.pricing_model === 'multi-tier' ? 'Varies by vehicle' : undefined
+      };
+    });
+
+  const toggleServiceSelection = (offeringId: string) => {
+    setSelectedOfferingIds((prev) => {
+      if (prev.includes(offeringId)) {
+        return prev.filter((id) => id !== offeringId);
+      }
+      return [...prev, offeringId];
+    });
+  };
+
+  const handleSocialClick = (url: string) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  function TikTokIcon({ className }: { className?: string }) {
+    return (
+      <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+        <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-5.2 1.74 2.89 2.89 0 012.31-4.64 2.93 2.93 0 01.88.13V9.4a6.84 6.84 0 00-1-.05A6.33 6.33 0 005 20.1a6.34 6.34 0 0010.86-4.43v-7a8.16 8.16 0 004.77 1.52v-3.4a4.85 4.85 0 01-1-.1z" />
+      </svg>
+    );
+  }
+  const SOCIAL_ICONS = { instagram: Instagram, tiktok: TikTokIcon, facebook: Facebook } as const;
+
+  return (
+    <div className="flex flex-col h-full min-h-0 bg-gradient-to-b from-gray-50 to-white">
+      {/* Header - fixed */}
+      <div className="flex-shrink-0 bg-white border-b z-10">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
+          <button
+            onClick={handleBack}
+            className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+            aria-label="Back"
+          >
+            <ArrowLeft className="w-5 h-5 text-gray-700" />
+          </button>
+          <div>
+            <h1 className="font-semibold text-gray-900">{isClientView ? 'Detailer Profile' : 'Public Profile Preview'}</h1>
+            <p className="text-xs text-gray-600">{isClientView ? 'View gig details' : 'This is how customers see your profile'}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Scrollable content */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="max-w-2xl mx-auto p-4 space-y-4 pb-24">
+        {/* Brand Header */}
+        <BrandHeader {...detailer} />
+
+        {/* Social Strip - from dealer_social_links */}
+        {socialLinks.length > 0 ? (
+          <div className="bg-white rounded-2xl shadow-sm border p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-sm font-medium text-gray-900">Follow Us</span>
+              <span className="text-xs text-gray-500">({socialLinks.length} connected)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {socialLinks.map((link) => {
+                const Icon = SOCIAL_ICONS[link.platform];
+                const label = link.platform.charAt(0).toUpperCase() + link.platform.slice(1);
+                const colors: Record<SocialPlatform, string> = {
+                  instagram: 'bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400',
+                  tiktok: 'bg-black',
+                  facebook: 'bg-blue-600',
+                };
+                return (
+                  <button
+                    key={link.platform}
+                    onClick={() => handleSocialClick(link.url)}
+                    title={`Visit ${label}`}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center text-white transition-transform hover:scale-110 active:scale-95 ${colors[link.platform]}`}
+                  >
+                    <Icon className="w-5 h-5" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl shadow-sm border p-4">
+            <p className="text-sm text-gray-500">Add your social links in Settings → Social to show them here.</p>
+          </div>
+        )}
+
+        {/* Video Intro */}
+        <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
+          <div className="aspect-video bg-gradient-to-br from-blue-900 to-indigo-900 relative flex items-center justify-center cursor-pointer group">
+            <div className="absolute inset-0 bg-black/20" />
+            <div className="relative">
+              <div className="w-20 h-20 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Play className="w-8 h-8 text-blue-600 ml-1" />
+              </div>
+            </div>
+            <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
+              <p className="text-white font-medium">Meet Your Detailer - Introduction Video</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Before/After Carousel */}
+        <BeforeAfterCarousel
+          items={portfolioItems}
+          onViewGallery={() => setShowGallery(true)}
+        />
+
+        {/* Services & Pricing */}
+        <div className="bg-white rounded-2xl shadow-sm border p-6">
+          <h3 className="font-semibold text-lg text-gray-900 mb-4">Services, pricing, and operating hours</h3>
+          {services.length > 0 ? (
+            <div className="space-y-3">
+              {services.map((service) => {
+                const isSelected = selectedOfferingIds.includes(service.id);
+                return (
+                <button
+                  type="button"
+                  key={service.id}
+                  onClick={() => isClientView && toggleServiceSelection(service.id)}
+                  className={`w-full text-left flex items-start justify-between p-4 rounded-xl bg-gradient-to-br border transition ${
+                    isClientView
+                      ? isSelected
+                        ? 'from-blue-50 to-white border-blue-300 ring-1 ring-blue-200'
+                        : 'from-gray-50 to-white border-gray-200 hover:border-blue-300'
+                      : 'from-gray-50 to-white border-gray-200 cursor-default'
+                  }`}
+                  disabled={!isClientView}
+                >
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-900">{service.name}</div>
+                    <div className="text-sm text-gray-600 mt-1">{service.description}</div>
+                    {service.pricingNote && (
+                      <div className="text-xs text-gray-500 mt-1">{service.pricingNote}</div>
+                    )}
+                  </div>
+                  <div className="text-right ml-4">
+                    <div className="font-semibold text-blue-600">{service.price}</div>
+                    {isClientView && (
+                      <div className={`mt-1 text-xs ${isSelected ? 'text-blue-700' : 'text-gray-500'}`}>
+                        {isSelected ? 'Selected' : 'Tap to select'}
+                      </div>
+                    )}
+                  </div>
+                </button>
+              )})}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <p className="mb-2">No services configured yet.</p>
+              {!isClientView && (
+                <p className="text-sm">Go to Settings → Services to add your services and pricing.</p>
+              )}
+            </div>
+          )}
+          {isClientView && services.length > 0 && (
+            <p className="text-xs text-gray-500 mt-3">
+              Select one or more services, then tap Request Quote.
+            </p>
+          )}
+        </div>
+
+        {/* Reviews & Highlights - real client reviews only */}
+        <div className="bg-white rounded-2xl shadow-sm border p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-lg text-gray-900">Reviews & Highlights</h3>
+            <div className="flex items-center gap-2">
+              <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
+              <span className="font-bold text-xl text-gray-900">{(dealerRating?.rating ?? 0).toFixed(1)}</span>
+              <span className="text-gray-600">({dealerRating?.review_count ?? 0} reviews)</span>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {reviews.length > 0 ? (
+              reviews.slice(0, 5).map((review) => (
+                <div key={review.id} className="p-4 rounded-xl bg-gradient-to-br from-gray-50 to-white border border-gray-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium text-gray-900">{review.client_name ?? 'Anonymous'}</span>
+                    <div className="flex gap-0.5">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star
+                          key={star}
+                          className={`w-4 h-4 ${star <= review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  {review.review_text && <p className="text-gray-700 text-sm leading-relaxed">{review.review_text}</p>}
+                  <p className="text-xs text-gray-500 mt-1">
+                    {new Date(review.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-gray-500 py-4 text-center">No reviews yet. Reviews will appear here after clients complete orders and leave feedback.</p>
+            )}
+          </div>
+        </div>
+
+        {/* Brand Story / Our Story - from dealer_profiles.bio or detailer */}
+        <div className="bg-white rounded-2xl shadow-sm border p-6">
+          <h3 className="font-semibold text-lg text-gray-900 mb-4">Our Story</h3>
+          <div className="space-y-4 text-gray-700">
+            {(isClientView ? bioContent : dealerProfile?.bio) ? (
+              <p className="whitespace-pre-line">{isClientView ? bioContent : dealerProfile?.bio}</p>
+            ) : (
+              <p className="text-gray-500 italic">{isClientView ? 'No bio provided.' : 'Add your bio in Settings → Profile to tell customers about your business.'}</p>
+            )}
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+              {((isClientView ? yearsInBusiness : dealerProfile?.years_in_business) != null && (isClientView ? yearsInBusiness : dealerProfile?.years_in_business)! > 0) && (
+                <div>
+                  <div className="text-2xl font-bold text-blue-600 mb-1">{(isClientView ? yearsInBusiness : dealerProfile?.years_in_business)}+</div>
+                  <div className="text-sm text-gray-600">Years Experience</div>
+                </div>
+              )}
+              <div>
+                <div className="text-2xl font-bold text-blue-600 mb-1">{completedJobs}</div>
+                <div className="text-sm text-gray-600">Jobs Completed</div>
+              </div>
+            </div>
+            {((isClientView ? certifications : dealerProfile?.certifications)?.length ?? 0) > 0 && (
+              <div className="pt-4 border-t">
+                <div className="font-medium text-gray-900 mb-2">Certifications</div>
+                <p className="text-sm">{(isClientView ? certifications : dealerProfile?.certifications)!.join(', ')}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      </div>
+
+      {/* Sticky CTA Buttons */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 shadow-lg">
+        <div className="max-w-2xl mx-auto flex gap-3">
+          {isClientView && onRequestQuote && onMessage ? (
+            <>
+              <button
+                onClick={() =>
+                  onRequestQuote(
+                    services
+                      .filter((service) => selectedOfferingIds.includes(service.id))
+                      .map((service) => ({ 
+                        id: service.id, 
+                        name: service.name,
+                        price: service.numericPrice
+                      }))
+                  )
+                }
+                disabled={selectedOfferingIds.length === 0}
+                className="flex-1 h-14 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-lg hover:from-blue-700 hover:to-blue-800 transition-all active:scale-95 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Request Quote
+              </button>
+              <button
+                onClick={onMessage}
+                className="flex-shrink-0 h-14 px-6 rounded-xl border-2 border-blue-600 text-blue-600 font-bold hover:bg-blue-50 transition-all active:scale-95 flex items-center gap-2"
+              >
+                <Mail className="w-5 h-5" />
+                Message
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => navigate('/client/request-quote')}
+              className="w-full h-14 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-lg hover:from-blue-700 hover:to-blue-800 transition-all active:scale-95 shadow-lg"
+            >
+              Request Quote
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Gallery Lightbox */}
+      <GalleryLightbox
+        isOpen={showGallery}
+        onClose={() => setShowGallery(false)}
+        items={portfolioItems}
+      />
+
+    </div>
+  );
+}
