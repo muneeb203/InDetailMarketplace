@@ -40,7 +40,6 @@ import { supabase } from "./lib/supabaseClient";
 import { getLeadCost } from "./services/stripeService";
 import { FileText, AlertCircle, ArrowLeft } from "lucide-react";
 import { Button } from "./components/ui/button";
-import { DebugDataSource } from "./components/DebugDataSource";
 import { useAuth } from "./context/AuthContext";
 import { useDealerProfile } from "./hooks/useDealerProfile";
 import { useUnreadMessages } from "./hooks/useUnreadMessages";
@@ -1127,10 +1126,6 @@ export default function AppRoleAware() {
                   setCurrentView("request-quote");
                 }
               }}
-            />
-            <DebugDataSource 
-              detailersCount={displayDetailers.length}
-              isFromSupabase={detailers.length > 0}
             />
           </>
         )}

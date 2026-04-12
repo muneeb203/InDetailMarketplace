@@ -3,6 +3,7 @@ import { Bell, MessageSquare, Calendar, Activity, FileText, AlertCircle, Home, S
 import { Badge } from './ui/badge';
 import { ProfileSidebar } from './ProfileSidebar';
 import { AvatarWithFallback } from './ui/avatar-with-fallback';
+import { MobileNavigation } from './MobileNavigation';
 import type { Vehicle } from '../types';
 
 interface WebLayoutProps {
@@ -43,10 +44,77 @@ export function WebLayout({
   unreadNotifications = 0,
 }: WebLayoutProps) {
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Use business name for detailers, personal name for clients
   const displayName = userRole === 'detailer' && businessName ? businessName : userName;
   const accountType = userRole === 'client' ? 'Client Account' : 'Detailer Account';
+
+  // Detect mobile screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Mobile layout (phones and small tablets)
+  if (isMobile) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        {/* Mobile Top Bar */}
+        <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-30">
+          <div className="flex items-center gap-3">
+            <AvatarWithFallback
+              src={userRole === 'detailer' ? dealerLogoUrl : clientAvatarUrl}
+              name={displayName}
+              size="sm"
+            />
+            <div>
+              <p className="font-semibold text-gray-900 text-sm">{displayName}</p>
+              <p className="text-xs text-gray-500">{accountType}</p>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="flex items-center gap-2">
+            {userRole === 'detailer' && (
+              <button
+                onClick={() => onNavigate('pro-public-profile')}
+                className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-full hover:bg-blue-100 transition-colors"
+              >
+                View Gig
+              </button>
+            )}
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <main className="pb-20">
+          {children}
+        </main>
+
+        {/* Mobile Navigation */}
+        <MobileNavigation
+          currentView={currentView}
+          onNavigate={onNavigate}
+          userName={userName}
+          businessName={businessName}
+          userRole={userRole}
+          dealerLogoUrl={dealerLogoUrl}
+          clientAvatarUrl={clientAvatarUrl}
+          onLogout={onLogout}
+          unreadMessages={unreadMessages}
+          unreadNotifications={unreadNotifications}
+        />
+      </div>
+    );
+  }
+
+  // Desktop layout (existing)
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">

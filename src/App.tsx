@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import AppRoleAware from './AppRoleAware';
 import { getAdminUser } from './admin/adminAuth';
 import { AdminLogin } from './admin/AdminLogin';
-import { AdminLayout } from './admin/AdminLayout';
+import AdminLayout from './admin/AdminLayout';
 import { DashboardOverview } from './admin/pages/DashboardOverview';
 import { UsersPage } from './admin/pages/UsersPage';
 import { DealersPage } from './admin/pages/DealersPage';

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import {
@@ -9,6 +10,8 @@ import {
   Star,
   Settings,
   LogOut,
+  Menu,
+  X,
 } from 'lucide-react';
 
 const nav = [
@@ -21,47 +24,99 @@ const nav = [
   { to: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 
-export function AdminLayout() {
+export default function AdminLayout() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    window.location.href = '/';
+    window.location.href = '/admin/login';
   };
 
   return (
-    <div className="min-h-screen flex bg-gray-100">
-      <aside className="w-56 bg-gray-900 text-white flex flex-col flex-shrink-0">
-        <div className="p-4 border-b border-gray-700">
-          <h2 className="font-semibold text-lg">Admin Panel</h2>
+    <div className="min-h-screen bg-gray-50">
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <div className={`
+        fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out
+        lg:translate-x-0 lg:static lg:inset-0
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
+          <h1 className="text-xl font-bold text-gray-900">Admin Panel</h1>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
-        <nav className="flex-1 p-2 space-y-0.5">
-          {nav.map(({ to, label, icon: Icon }) => (
+
+        <nav className="mt-6 px-3">
+          {nav.map((item) => (
             <NavLink
-              key={to}
-              to={to}
+              key={item.to}
+              to={item.to}
+              onClick={() => setSidebarOpen(false)}
               className={({ isActive }) =>
-                `flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
-                  isActive ? 'bg-gray-700 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                `flex items-center px-3 py-2 mb-1 text-sm font-medium rounded-md transition-colors ${
+                  isActive
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                 }`
               }
             >
-              <Icon className="w-4 h-4" />
-              {label}
+              <item.icon className="mr-3 h-5 w-5" />
+              {item.label}
             </NavLink>
           ))}
         </nav>
-        <div className="p-2 border-t border-gray-700">
+
+        <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-gray-200">
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 w-full px-3 py-2 rounded-md text-sm text-gray-300 hover:bg-gray-800 hover:text-white"
+            className="flex items-center w-full px-3 py-2 text-sm font-medium text-red-600 rounded-md hover:bg-red-50 hover:text-red-700 transition-colors"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="mr-3 h-5 w-5" />
             Logout
           </button>
         </div>
-      </aside>
-      <main className="flex-1 overflow-auto p-6">
-        <Outlet />
-      </main>
+      </div>
+
+      {/* Main content */}
+      <div className="lg:pl-64">
+        {/* Mobile header */}
+        <div className="lg:hidden flex items-center justify-between h-16 px-4 bg-white border-b border-gray-200">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+          >
+            <Menu className="h-6 w-6" />
+          </button>
+          <h1 className="text-lg font-semibold text-gray-900">Admin Panel</h1>
+          <div className="w-10" /> {/* Spacer for centering */}
+        </div>
+
+        {/* Page content */}
+        <main className="p-4 lg:p-8">
+          <Outlet />
+        </main>
+      </div>
+
+      {/* Mobile FAB for quick access */}
+      <button
+        onClick={() => setSidebarOpen(true)}
+        className="fixed bottom-6 left-4 z-30 lg:hidden w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg transition-all duration-300 flex items-center justify-center"
+        aria-label="Open admin menu"
+      >
+        <Menu className="w-6 h-6" />
+      </button>
     </div>
   );
 }
