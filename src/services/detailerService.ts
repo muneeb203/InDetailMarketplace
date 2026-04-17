@@ -62,8 +62,6 @@ export async function fetchDetailers(filters?: DetailerFilters): Promise<Detaile
       return [];
     }
 
-    console.log(`✅ Found ${dealerData.length} dealer_profiles`);
-
     // Now fetch the corresponding profiles
     const dealerIds = dealerData.map(d => d.id);
     const { data: profileData, error: profileError } = await supabase
@@ -75,8 +73,6 @@ export async function fetchDetailers(filters?: DetailerFilters): Promise<Detaile
       console.error('❌ Error fetching profiles:', profileError);
       throw profileError;
     }
-
-    console.log(`✅ Found ${profileData?.length || 0} matching profiles`);
 
     // Combine the data
     const detailers: Detailer[] = dealerData.map((dealer: any) => {
@@ -129,8 +125,6 @@ export async function fetchDetailers(filters?: DetailerFilters): Promise<Detaile
         commPreference: dealer.comm_preference || 'voice-chat', // Default to voice-chat to show call button
       };
     }).filter(Boolean) as Detailer[];
-
-    console.log(`✅ Transformed ${detailers.length} detailers successfully`);
 
     // Apply client-side filters (for complex filtering)
     let filteredDetailers = detailers;

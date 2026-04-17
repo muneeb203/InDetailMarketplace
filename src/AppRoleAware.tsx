@@ -81,7 +81,17 @@ type AuthFlow = "signin" | "signup";
 export default function AppRoleAware() {
   const { currentUser, setCurrentUser, clearUser } = useAuth();
   const [currentView, setCurrentView] = useState<View>("welcome");
-  const [selectedRole, setSelectedRole] = useState<"client" | "detailer" | null>(null);
+  const [selectedRole, setSelectedRole] = useState<"client" | "detailer" | null>(() => {
+    // Try to load the user's last known correct role from localStorage
+    const savedRole = localStorage.getItem('user_correct_role') as 'client' | 'detailer' | null;
+    return savedRole;
+  });
+
+  // Helper function to save the user's correct role for future visits
+  const saveCorrectRole = (role: 'client' | 'detailer') => {
+    localStorage.setItem('user_correct_role', role);
+    setSelectedRole(role);
+  };
   const [authFlow, setAuthFlow] = useState<AuthFlow>("signin");
   const [tempUserData, setTempUserData] = useState<{
     userId: string;
@@ -129,11 +139,6 @@ export default function AppRoleAware() {
     viewingConversationId
   );
   const { unreadCount: unreadNotifications } = useNotifications(currentUser?.id);
-  
-  // Log what we got from Supabase
-  console.log('📊 Detailers from Supabase:', detailers.length, 'detailers');
-  console.log('⏳ Loading:', detailersLoading);
-  console.log('❌ Error:', detailersError);
   
   const displayDetailers = detailers;
   
@@ -198,7 +203,7 @@ export default function AppRoleAware() {
           avatar: result.profile.avatar_url ?? undefined,
           vehicles: [],
         } as any);
-        setSelectedRole('client');
+        saveCorrectRole('client');
         setCurrentView('onboarding-client');
         toast.success('Welcome! Please complete your profile.');
         return;
@@ -252,7 +257,7 @@ export default function AppRoleAware() {
           completedJobs: 0,
           createdAt: new Date(result.profile.created_at ?? new Date()),
         } as any);
-        setSelectedRole('detailer');
+        saveCorrectRole('detailer');
         setCurrentView('onboarding-detailer');
         toast.success('Welcome! Please complete your business details.');
         return;
@@ -386,7 +391,7 @@ export default function AppRoleAware() {
             }).eq('id', session.user.id);
 
             setTempUserData({ userId: session.user.id, name: d.name, email, phone: d.phone, role: d.role });
-            setSelectedRole(d.role);
+            saveCorrectRole(d.role);
             toast.success('Account created! Complete your profile.');
             setTimeout(() => {
               setCurrentView(d.role === 'client' ? 'onboarding-client' : 'onboarding-detailer');
@@ -432,15 +437,24 @@ export default function AppRoleAware() {
         const result = await loadProfileForUser(session.user);
         const actualRole = result.appRole === 'admin' ? 'detailer' : result.appRole;
 
-        // Role mismatch — block and show clear error (never silently change roles)
+        // Role mismatch — block and show clear error with auto-correction
         if (actualRole !== pendingRole) {
           await supabase.auth.signOut();
           const correctLabel = actualRole === 'client' ? 'Client' : 'Detailer';
           const selectedLabel = pendingRole === 'client' ? 'Client' : 'Detailer';
+          
+          // Auto-correct the selected role and save it for future visits
+          saveCorrectRole(actualRole);
+          
           toast.error(`Wrong role selected`, {
-            description: `This Google account is registered as a ${correctLabel}, but you tried to sign in as ${selectedLabel}. Please go back and select ${correctLabel}.`,
-            duration: 8000,
+            description: `This Google account is registered as a ${correctLabel}, but you tried to sign in as ${selectedLabel}. We've automatically selected ${correctLabel} for you. Please try signing in again.`,
+            duration: 10000,
+            action: {
+              label: 'Sign In as ' + correctLabel,
+              onClick: () => handleGoogleSignIn(actualRole)
+            }
           });
+          
           setCurrentView('welcome');
           return;
         }
@@ -957,6 +971,7 @@ export default function AppRoleAware() {
   const handleBackToWelcome = () => {
     setCurrentView("welcome");
     setSelectedRole(null);
+    // Don't clear the saved role when going back to welcome - keep it for better UX
   };
 
   const handleSwitchAuthFlow = () => {
@@ -970,11 +985,14 @@ export default function AppRoleAware() {
       clearUser();
       setCurrentView("welcome");
       setSelectedRole(null);
+      // Clear the saved role on logout so user can choose fresh next time
+      localStorage.removeItem('user_correct_role');
       toast.success("You have been signed out.");
     } catch {
       clearUser();
       setCurrentView("welcome");
       setSelectedRole(null);
+      localStorage.removeItem('user_correct_role');
       toast.success("You have been signed out.");
     }
   };
@@ -1045,6 +1063,13 @@ export default function AppRoleAware() {
         />
       </>
     );
+  }
+
+  // Handle invalid state - redirect to welcome if we're in signin/signup without a role
+  if ((currentView === "signin" || currentView === "signup") && !selectedRole) {
+    console.warn('Invalid state: signin/signup without selectedRole, redirecting to welcome');
+    setCurrentView("welcome");
+    return null;
   }
 
   // Client onboarding

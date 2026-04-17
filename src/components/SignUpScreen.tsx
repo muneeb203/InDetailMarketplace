@@ -24,6 +24,21 @@ export function SignUpScreen({
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
   const [touched, setTouched] = useState<{ name?: boolean; phone?: boolean }>({});
 
+  // Early return if role is invalid
+  if (!role) {
+    console.error('SignUpScreen: role prop is required');
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#EAF5FF] to-white flex items-center justify-center p-6">
+        <div className="text-center">
+          <p className="text-red-600">Error: Invalid role configuration</p>
+          <button onClick={onBack} className="mt-4 text-blue-600 hover:text-blue-800">
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const validate = () => {
     const newErrors: { name?: string; phone?: string } = {};
     if (!name.trim()) newErrors.name = 'Name is required';
@@ -44,7 +59,7 @@ export function SignUpScreen({
   const handleGoogleSubmit = () => {
     setTouched({ name: true, phone: true });
     if (!validate()) return;
-    onGoogleSignUp({ name: name.trim(), phone, role });
+    onGoogleSignUp({ name: name.trim(), phone, role: safeRole });
   };
 
   const isValid = name.trim() && phone && Object.keys(errors).length === 0;
@@ -53,7 +68,10 @@ export function SignUpScreen({
     client: { icon: Car, label: 'Client' },
     detailer: { icon: SprayCanIcon, label: 'Detailer' },
   };
-  const RoleIcon = roleConfig[role].icon;
+  
+  // Ensure role is valid, default to 'client' if undefined
+  const safeRole = role || 'client';
+  const RoleIcon = roleConfig[safeRole]?.icon || Car;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#EAF5FF] to-white flex flex-col p-6">
@@ -88,7 +106,7 @@ export function SignUpScreen({
             </div>
             <div>
               <p className="text-xs text-gray-600">Signing up as</p>
-              <p className="text-sm">{roleConfig[role].label}</p>
+              <p className="text-sm">{roleConfig[safeRole]?.label || 'Client'}</p>
             </div>
           </div>
           <button onClick={onChangeRole} className="text-xs text-[#0078FF] hover:text-[#0056CC] transition-colors">
@@ -107,6 +125,7 @@ export function SignUpScreen({
               onChange={(e) => { setName(e.target.value); if (touched.name) validate(); }}
               onBlur={() => handleBlur('name')}
               placeholder="John Doe"
+              autoComplete="name"
               className={`h-11 border-[#0078FF]/50 bg-white ${
                 touched.name && errors.name
                   ? 'border-red-500 focus-visible:ring-red-500'
@@ -132,6 +151,7 @@ export function SignUpScreen({
               onChange={(e) => { setPhone(e.target.value); if (touched.phone) validate(); }}
               onBlur={() => handleBlur('phone')}
               placeholder="(555) 123-4567"
+              autoComplete="tel"
               className={`h-11 border-[#0078FF]/50 bg-white ${
                 touched.phone && errors.phone
                   ? 'border-red-500 focus-visible:ring-red-500'

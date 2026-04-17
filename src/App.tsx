@@ -13,6 +13,8 @@ import { ReviewsPage } from './admin/pages/ReviewsPage';
 import { AdminSettings } from './pages/AdminSettings';
 import { PaymentNotificationManager } from './components/PaymentNotificationManager';
 import { StripeConnectSimulation } from './pages/StripeConnectSimulation';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
+import { ForgotPasswordDemo } from './components/ForgotPasswordDemo';
 
 function AdminProtected() {
   const [loading, setLoading] = useState(true);
@@ -50,8 +52,15 @@ function AdminProtected() {
 export default function App() {
   return (
     <PaymentNotificationManager>
-      <BrowserRouter>
+      <BrowserRouter
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
         <Routes>
+          <Route path="reset-password" element={<ResetPasswordPage />} />
+          <Route path="forgot-password-demo" element={<ForgotPasswordDemo />} />
           <Route path="stripe-connect-simulation" element={<StripeConnectSimulation />} />
           <Route path="admin" element={<AdminProtected />}>
             <Route index element={<Navigate to="/admin/login" replace />} />

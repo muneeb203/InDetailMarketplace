@@ -20,7 +20,9 @@ export function useUnreadMessages(
     try {
       const count = await getUnreadCount(userId, userRole);
       setUnreadCount(count);
-    } catch {
+    } catch (error) {
+      // Silently handle errors - conversations might not exist yet or user might not have access
+      console.debug('Could not fetch unread count:', error);
       setUnreadCount(0);
     }
   }, [userId, userRole]);
@@ -64,7 +66,10 @@ export function useUnreadMessages(
           });
         });
       })
-      .catch(() => {});
+      .catch((error) => {
+        // Silently handle errors - conversations might not exist yet or user might not have access
+        console.debug('Could not fetch conversations for subscription:', error);
+      });
 
     return () => {
       unsub?.();

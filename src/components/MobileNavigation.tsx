@@ -135,9 +135,10 @@ export function MobileNavigation({
       {/* Floating Action Button - Menu Toggle */}
       <button
         onClick={() => setIsMenuOpen(true)}
-        className={`fixed left-4 bottom-6 z-50 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg transition-all duration-300 flex items-center justify-center md:hidden ${
+        className={`fixed left-4 bottom-6 z-50 w-14 h-14 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-full shadow-lg transition-all duration-300 flex items-center justify-center md:hidden touch-manipulation ${
           isVisible ? 'translate-y-0 opacity-100' : 'translate-y-16 opacity-0'
         }`}
+        style={{ WebkitTapHighlightColor: 'transparent' }}
         aria-label="Open navigation menu"
       >
         <Menu className="w-6 h-6" />
@@ -146,9 +147,10 @@ export function MobileNavigation({
       {/* Notifications Button */}
       <button
         onClick={() => handleNavigate('notifications')}
-        className={`fixed right-4 bottom-6 z-50 w-12 h-12 bg-white hover:bg-gray-50 text-gray-700 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center md:hidden ${
+        className={`fixed right-4 bottom-6 z-50 w-12 h-12 bg-white hover:bg-gray-50 active:bg-gray-100 text-gray-700 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center md:hidden touch-manipulation ${
           isVisible ? 'translate-y-0 opacity-100' : 'translate-y-16 opacity-0'
         }`}
+        style={{ WebkitTapHighlightColor: 'transparent' }}
         aria-label="Notifications"
       >
         <Bell className="w-5 h-5" />
@@ -190,7 +192,8 @@ export function MobileNavigation({
             </div>
             <button
               onClick={() => setIsMenuOpen(false)}
-              className="p-2 hover:bg-white/10 rounded-full transition-colors"
+              className="p-2 hover:bg-white/10 rounded-full transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
+              style={{ WebkitTapHighlightColor: 'transparent' }}
               aria-label="Close menu"
             >
               <X className="w-5 h-5" />
@@ -204,11 +207,12 @@ export function MobileNavigation({
             <button
               key={item.id}
               onClick={() => handleNavigate(item.view)}
-              className={`w-full flex items-center justify-between px-6 py-4 text-left transition-colors ${
+              className={`w-full flex items-center justify-between px-6 py-4 text-left transition-colors min-h-[56px] touch-manipulation ${
                 item.isActive
                   ? 'bg-blue-50 text-blue-600 border-r-4 border-blue-600'
-                  : 'text-gray-700 hover:bg-gray-50'
+                  : 'text-gray-700 hover:bg-gray-50 active:bg-gray-100'
               }`}
+              style={{ WebkitTapHighlightColor: 'transparent' }}
             >
               <div className="flex items-center gap-4">
                 <div className="relative">
@@ -229,11 +233,12 @@ export function MobileNavigation({
           {userRole === 'detailer' && (
             <button
               onClick={() => handleNavigate('pro-public-profile')}
-              className={`w-full flex items-center justify-between px-6 py-4 text-left transition-colors ${
+              className={`w-full flex items-center justify-between px-6 py-4 text-left transition-colors min-h-[56px] touch-manipulation ${
                 currentView === 'pro-public-profile'
                   ? 'bg-blue-50 text-blue-600 border-r-4 border-blue-600'
-                  : 'text-gray-700 hover:bg-gray-50'
+                  : 'text-gray-700 hover:bg-gray-50 active:bg-gray-100'
               }`}
+              style={{ WebkitTapHighlightColor: 'transparent' }}
             >
               <div className="flex items-center gap-4">
                 <Activity className="w-5 h-5" />
@@ -249,11 +254,12 @@ export function MobileNavigation({
           {/* Settings */}
           <button
             onClick={() => handleNavigate('settings')}
-            className={`w-full flex items-center justify-between px-6 py-4 text-left transition-colors ${
+            className={`w-full flex items-center justify-between px-6 py-4 text-left transition-colors min-h-[56px] touch-manipulation ${
               currentView === 'settings'
                 ? 'bg-blue-50 text-blue-600 border-r-4 border-blue-600'
-                : 'text-gray-700 hover:bg-gray-50'
+                : 'text-gray-700 hover:bg-gray-50 active:bg-gray-100'
             }`}
+            style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             <div className="flex items-center gap-4">
               <Settings className="w-5 h-5" />
@@ -269,7 +275,8 @@ export function MobileNavigation({
                 onLogout();
                 setIsMenuOpen(false);
               }}
-              className="w-full flex items-center justify-between px-6 py-4 text-left transition-colors text-red-600 hover:bg-red-50"
+              className="w-full flex items-center justify-between px-6 py-4 text-left transition-colors text-red-600 hover:bg-red-50 active:bg-red-100 min-h-[56px] touch-manipulation"
+              style={{ WebkitTapHighlightColor: 'transparent' }}
             >
               <div className="flex items-center gap-4">
                 <LogOut className="w-5 h-5" />

@@ -235,6 +235,7 @@ export const DetailerConnectSetup: React.FC<DetailerConnectSetupProps> = ({
               value={formData.email}
               onChange={(e) => handleInputChange('email', e.target.value)}
               placeholder="your@email.com"
+              autoComplete="email"
               required
             />
           </div>

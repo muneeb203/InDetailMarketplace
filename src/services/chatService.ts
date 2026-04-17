@@ -95,7 +95,18 @@ export async function fetchConversations(
     .eq(col, userId)
     .order('created_at', { ascending: false });
 
-  if (error) throw error;
+  if (error) {
+    // Handle common errors gracefully
+    if (error.code === 'PGRST116' || error.message?.includes('relation "conversations" does not exist')) {
+      console.debug('Conversations table does not exist yet');
+      return [];
+    }
+    if (error.code === '42501' || error.message?.includes('permission denied')) {
+      console.debug('No permission to access conversations');
+      return [];
+    }
+    throw error;
+  }
   return (data || []) as ConversationRow[];
 }
 
@@ -273,28 +284,47 @@ export async function getUnreadCount(
   userId: string,
   role: 'client' | 'detailer'
 ): Promise<number> {
-  const { data: convs, error: convError } = await supabase
-    .from('conversations')
-    .select('id, client_id, dealer_id, client_last_read_at, dealer_last_read_at')
-    .eq(role === 'client' ? 'client_id' : 'dealer_id', userId);
+  try {
+    const { data: convs, error: convError } = await supabase
+      .from('conversations')
+      .select('id, client_id, dealer_id, client_last_read_at, dealer_last_read_at')
+      .eq(role === 'client' ? 'client_id' : 'dealer_id', userId);
 
-  if (convError || !convs?.length) return 0;
+    if (convError) {
+      // Handle common errors gracefully
+      if (convError.code === 'PGRST116' || convError.message?.includes('relation "conversations" does not exist')) {
+        console.debug('Conversations table does not exist yet');
+        return 0;
+      }
+      if (convError.code === '42501' || convError.message?.includes('permission denied')) {
+        console.debug('No permission to access conversations');
+        return 0;
+      }
+      console.debug('Error fetching conversations for unread count:', convError);
+      return 0;
+    }
 
-  const readCol = role === 'client' ? 'client_last_read_at' : 'dealer_last_read_at';
-  let total = 0;
+    if (!convs?.length) return 0;
 
-  for (const c of convs) {
-    const since = c[readCol] || '1970-01-01T00:00:00Z';
-    const { count, error } = await supabase
-      .from('messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('conversation_id', c.id)
-      .neq('sender_id', userId)
-      .gt('created_at', since);
-    if (!error && count != null) total += count;
+    const readCol = role === 'client' ? 'client_last_read_at' : 'dealer_last_read_at';
+    let total = 0;
+
+    for (const c of convs) {
+      const since = c[readCol] || '1970-01-01T00:00:00Z';
+      const { count, error } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('conversation_id', c.id)
+        .neq('sender_id', userId)
+        .gt('created_at', since);
+      if (!error && count != null) total += count;
+    }
+
+    return total;
+  } catch (error) {
+    console.debug('Unexpected error getting unread count:', error);
+    return 0;
   }
-
-  return total;
 }
 
 /**

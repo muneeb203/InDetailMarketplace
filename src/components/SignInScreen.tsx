@@ -4,6 +4,7 @@ import { Input } from './ui/input';
 import { Card } from './ui/card';
 import { ArrowLeft, Eye, EyeOff, Car, SprayCanIcon, Loader2, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { ForgotPasswordModal } from './ForgotPasswordModal';
 
 interface SignInScreenProps {
   role: 'client' | 'detailer';
@@ -29,6 +30,22 @@ export function SignInScreen({
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [touched, setTouched] = useState<{ email?: boolean; password?: boolean }>({});
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
+
+  // Early return if role is invalid
+  if (!role) {
+    console.error('SignInScreen: role prop is required');
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#EAF5FF] to-white flex items-center justify-center p-6">
+        <div className="text-center">
+          <p className="text-red-600">Error: Invalid role configuration</p>
+          <button onClick={onBack} className="mt-4 text-blue-600 hover:text-blue-800">
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const validate = () => {
     const newErrors: { email?: string; password?: string } = {};
@@ -61,7 +78,7 @@ export function SignInScreen({
 
     try {
       setIsLoading(true);
-      await onSignIn(email, password, role);
+      await onSignIn(email, password, safeRole);
     } finally {
       setIsLoading(false);
     }
@@ -82,7 +99,9 @@ export function SignInScreen({
     },
   };
 
-  const RoleIcon = roleConfig[role].icon;
+  // Ensure role is valid, default to 'client' if undefined
+  const safeRole = role || 'client';
+  const RoleIcon = roleConfig[safeRole]?.icon || Car;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#EAF5FF] to-white flex flex-col p-6">
@@ -119,7 +138,7 @@ export function SignInScreen({
             </div>
             <div>
               <p className="text-xs text-gray-600">Signing in as</p>
-              <p className="text-sm">{roleConfig[role].label}</p>
+              <p className="text-sm">{roleConfig[safeRole]?.label || 'Client'}</p>
             </div>
           </div>
           <button
@@ -183,6 +202,7 @@ export function SignInScreen({
                 }}
                 onBlur={() => handleBlur('email')}
                 placeholder="you@example.com"
+                autoComplete="email"
                 className={`h-11 ${
                   touched.email && errors.email
                     ? 'border-red-500 focus-visible:ring-red-500'
@@ -219,6 +239,7 @@ export function SignInScreen({
                   }}
                   onBlur={() => handleBlur('password')}
                   placeholder="Enter your password"
+                  autoComplete="current-password"
                   className={`h-11 pr-10 ${
                     touched.password && errors.password
                       ? 'border-red-500 focus-visible:ring-red-500'
@@ -271,7 +292,14 @@ export function SignInScreen({
               </div>
               <button
                 type="button"
-                className="text-sm text-[#0078FF] hover:text-[#0056CC] transition-colors"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('Forgot password clicked!');
+                  setShowForgotPasswordModal(true);
+                }}
+                className="text-sm text-[#0078FF] hover:text-[#0056CC] transition-colors min-h-[44px] flex items-center px-2 -mx-2 touch-manipulation"
+                style={{ WebkitTapHighlightColor: 'transparent' }}
               >
                 Forgot password?
               </button>
@@ -325,6 +353,12 @@ export function SignInScreen({
           </p>
         </div>
       </motion.div>
+
+      {/* Forgot Password Modal */}
+      <ForgotPasswordModal
+        isOpen={showForgotPasswordModal}
+        onClose={() => setShowForgotPasswordModal(false)}
+      />
     </div>
   );
 }

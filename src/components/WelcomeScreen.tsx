@@ -10,7 +10,10 @@ interface WelcomeScreenProps {
 }
 
 export function WelcomeScreen({ onContinue, onViewTerms, onViewPrivacy }: WelcomeScreenProps) {
-  const [selectedRole, setSelectedRole] = useState<'client' | 'detailer' | null>(null);
+  const [selectedRole, setSelectedRole] = useState<'client' | 'detailer' | null>(() => {
+    // Load the user's previously saved correct role
+    return localStorage.getItem('user_correct_role') as 'client' | 'detailer' | null;
+  });
 
   const handleRoleSelect = (role: 'client' | 'detailer') => {
     setSelectedRole(role);
@@ -53,14 +56,27 @@ export function WelcomeScreen({ onContinue, onViewTerms, onViewPrivacy }: Welcom
         </div>
 
         {/* Selection Instruction */}
-        <motion.p
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4 }}
-          className="text-center text-sm text-gray-700"
+          className="text-center"
         >
-          Select your role to get started
-        </motion.p>
+          {selectedRole ? (
+            <div className="space-y-2">
+              <p className="text-sm text-green-600 font-medium">
+                ✓ We remember you're a {selectedRole === 'client' ? 'Client' : 'Detailer'}
+              </p>
+              <p className="text-xs text-gray-600">
+                Select a different role if needed, or continue with your saved preference
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-700">
+              Select your role to get started
+            </p>
+          )}
+        </motion.div>
 
         {/* Role Selection Cards */}
         <div className="space-y-4">

@@ -99,6 +99,7 @@ export function AccountSecuritySection({ email, onDeleteAccount }: AccountSecuri
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="Min 6 characters"
+              autoComplete="new-password"
               minLength={6}
             />
           </div>
@@ -110,6 +111,7 @@ export function AccountSecuritySection({ email, onDeleteAccount }: AccountSecuri
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Confirm new password"
+              autoComplete="new-password"
             />
           </div>
           {newPassword && confirmPassword && newPassword !== confirmPassword && (
